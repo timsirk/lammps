@@ -150,6 +150,48 @@ Molecule::Molecule(LAMMPS *lmp, int narg, char **arg, int &index) :
               nbonds,nbondtypes,nangles,nangletypes,
               ndihedrals,ndihedraltypes,nimpropers,nimpropertypes);
   }
+
+int debug = 0;
+  // print rtypes
+  if(debug)
+    {
+
+  printf(" rtypes\n");
+    for (int i = 0; i < nrtypes; i++) {                                                                               
+      printf("%d %d\n",i+1,rtype[i]);
+    }
+
+  // print rcharges                                                                                                    
+  printf(" rcharges\n");
+    for (int i = 0; i < nrtypes; i++) {
+      printf("%d %f\n",i+1,rq[i]);                                                                              
+    }
+
+  // print rbonds
+  printf(" rbonds\n");
+    for (int i = 0; i < nrbonds; i++) {                                                                               
+      printf("%d %d %d %d \n",i+1, bond_ratom[i][0], bond_ratom[i][1], bond_ratom[i][2]);                                                                                  
+    }                                                                                                                 
+
+  // print rangles                                                                                                     
+  printf(" rangles\n");
+    for (int i = 0; i < nrangles; i++) {
+      printf("%d %d %d %d %d\n",i+1, angle_ratom[i][0], angle_ratom[i][1], angle_ratom[i][2], angle_ratom[i][3]);                                                                                  
+    }                                                                                                                 
+
+  // print rdihedrals
+  printf(" rdihedrals\n");
+    for (int i = 0; i < nrdihedrals; i++) {
+      printf("%d %d %d %d %d %d\n",i+1, dihedral_ratom[i][0], dihedral_ratom[i][1], dihedral_ratom[i][2], dihedral_ratom[i][3], dihedral_ratom[i][4]);                                                         
+    }                                                                                                                 
+
+  // print rimpropers
+  printf(" rimpropers\n");
+    for (int i = 0; i < nrimpropers; i++) {
+      printf("%d %d %d %d %d %d\n",i+1, improper_ratom[i][0], improper_ratom[i][1], improper_ratom[i][2], improper_ratom[i][3], improper_ratom[i][4]);                                                         
+    }                                                                                                                 
+  }
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -415,6 +457,11 @@ void Molecule::read(int flag)
     if (strspn(line," \t\n\r") == strlen(line)) continue;
 
     // search line for header keywords and set corresponding variable
+    else if (strstr(line,"rtypes")) sscanf(line,"%d",&nrtypes); 
+    else if (strstr(line,"rbonds")) sscanf(line,"%d",&nrbonds); 
+    else if (strstr(line,"rangles")) sscanf(line,"%d",&nrangles);
+    else if (strstr(line,"rdihedrals")) sscanf(line,"%d",&nrdihedrals);
+    else if (strstr(line,"rimpropers")) sscanf(line,"%d",&nrimpropers);
 
     if (strstr(line,"atoms")) sscanf(line,"%d",&natoms);
     else if (strstr(line,"bonds")) sscanf(line,"%d",&nbonds);
@@ -564,6 +611,34 @@ void Molecule::read(int flag)
       dbodyflag = 1;
       body(flag,1,line);
 
+    } else if (strcmp(keyword,"RTypes") == 0) {
+        rtypeflag = 1;
+        if (flag) rread(0,line);
+        else skip_lines(nrtypes,line);
+    } else if (strcmp(keyword,"RCharges") == 0) {
+        rqflag = 1;
+        if (flag) rread(1,line);
+        else skip_lines(nrtypes,line);
+    } else if (strcmp(keyword,"RBonds") == 0) {
+      if (nrbonds == 0)
+	error->all(FLERR,"Molecule file has rbonds but no nrbonds setting");
+        if (flag) rread(2,line);
+        else skip_lines(nrbonds,line);
+    } else if (strcmp(keyword,"RAngles") == 0) {
+      if (nrangles == 0)
+	error->all(FLERR,"Molecule file has rangles but no nrangles setting");
+        if (flag) rread(3,line);
+        else skip_lines(nrangles,line);
+    } else if (strcmp(keyword,"RDihedrals") == 0) {
+      if (nrdihedrals == 0)
+	error->all(FLERR,"Molecule file has rdihedrals but no nrdiherals setting");
+        if (flag) rread(4,line);
+        else skip_lines(nrdihedrals,line);
+    } else if (strcmp(keyword,"RImpropers") == 0) {
+      if (nrimpropers == 0)
+	error->all(FLERR,"Molecule file has rimpropers but no nrimpropers setting");
+        if (flag) rread(5,line);
+        else skip_lines(nrimpropers,line);
     } else error->one(FLERR,"Unknown section in molecule file");
 
     parse_keyword(1,line,keyword);
@@ -961,6 +1036,81 @@ void Molecule::dihedrals(int flag, char *line)
     for (int i = 0; i < natoms; i++)
       dihedral_per_atom = MAX(dihedral_per_atom,count[i]);
   }
+}
+
+/* ----------------------------------------------------------------------
+   read reaction topology types from file
+------------------------------------------------------------------------- */
+
+void Molecule::rread(int flag, char *line)
+{
+  int tmp,itype;
+  tagint m,atom1,atom2,atom3,atom4;
+
+  // read rtypes
+  if(flag == 0)
+    for (int i = 0; i < nrtypes; i++) {
+      readline(line);
+      sscanf(line,"%d %d",&tmp,&rtype[i]);
+    }
+
+  // read rcharges
+  if(flag == 1)
+    for (int i = 0; i < nrtypes; i++) {
+      readline(line);
+      sscanf(line,"%d %lg",&tmp,&rq[i]);
+    }
+
+  // read rbonds
+  if(flag == 2)
+    for (int i = 0; i < nrbonds; i++) {
+      readline(line);
+      sscanf(line,"%d %d " TAGINT_FORMAT " " TAGINT_FORMAT,
+         &tmp,&itype,&atom1,&atom2);
+      bond_ratom[i][0] = itype;
+      bond_ratom[i][1] = atom1;
+      bond_ratom[i][2] = atom2;
+    }
+
+  // read rangles
+  if(flag == 3)
+    for (int i = 0; i < nrangles; i++) {
+      readline(line);
+      sscanf(line,"%d %d " TAGINT_FORMAT " " TAGINT_FORMAT " " TAGINT_FORMAT,
+           &tmp,&itype,&atom1,&atom2,&atom3);
+      angle_ratom[i][0] = itype;
+      angle_ratom[i][1] = atom1;
+      angle_ratom[i][2] = atom2;
+      angle_ratom[i][3] = atom3;
+    }
+
+  // read rdihedrals
+  if(flag == 4)
+    for (int i = 0; i < nrdihedrals; i++) {
+      readline(line);
+      sscanf(line,"%d %d " TAGINT_FORMAT " " TAGINT_FORMAT " " 
+           TAGINT_FORMAT " " TAGINT_FORMAT " ",
+           &tmp,&itype,&atom1,&atom2,&atom3,&atom4);
+      dihedral_ratom[i][0] = itype;
+      dihedral_ratom[i][1] = atom1;
+      dihedral_ratom[i][2] = atom2;
+      dihedral_ratom[i][3] = atom3;
+      dihedral_ratom[i][4] = atom4;
+    }
+
+  // read rimpropers
+  if(flag == 5)
+    for (int i = 0; i < nrimpropers; i++) {
+      readline(line);
+      sscanf(line,"%d %d " TAGINT_FORMAT " " TAGINT_FORMAT " " 
+           TAGINT_FORMAT " " TAGINT_FORMAT " ",
+           &tmp,&itype,&atom1,&atom2,&atom3,&atom4);
+      improper_ratom[i][0] = itype;
+      improper_ratom[i][1] = atom1;
+      improper_ratom[i][2] = atom2;
+      improper_ratom[i][3] = atom3;
+      improper_ratom[i][4] = atom4;
+    }
 }
 
 /* ----------------------------------------------------------------------
@@ -1446,6 +1596,15 @@ void Molecule::initialize()
   dx = NULL;
   dxcom = NULL;
   dxbody = NULL;
+
+  // for rxn template
+  nrtypes = nrbonds = nrangles = nrdihedrals = nrimpropers = 0;
+  rtype = NULL;
+  rq = NULL;
+  bond_ratom = NULL;
+  angle_ratom = NULL;
+  dihedral_ratom = NULL;
+  improper_ratom = NULL;
 }
 
 /* ----------------------------------------------------------------------
@@ -1534,6 +1693,20 @@ void Molecule::allocate()
     if (nibody) memory->create(ibodyparams,nibody,"molecule:ibodyparams");
     if (ndbody) memory->create(dbodyparams,ndbody,"molecule:dbodyparams");
   }
+
+  // reaction fields
+  if (nrtypes)
+    memory->create(rtype,nrtypes,"molecule:rtypes");
+  if (rqflag)
+    memory->create(rq,nrtypes,"molecule:q");
+  if (nrbonds) 
+    memory->create(bond_ratom,nrbonds,3, "molecule:bond_ratom");
+  if (nrangles) 
+    memory->create(angle_ratom,nrangles,4, "molecule:angle_ratom");
+  if (nrdihedrals) 
+    memory->create(dihedral_ratom,nrdihedrals,5, "molecule:dihedral_ratom");
+  if (nrimpropers) 
+    memory->create(improper_ratom,nrimpropers,5, "molecule:improper_ratom");
 }
 
 /* ----------------------------------------------------------------------
@@ -1585,6 +1758,14 @@ void Molecule::deallocate()
 
   memory->destroy(ibodyparams);
   memory->destroy(dbodyparams);
+
+  // rxn arrays
+  memory->destroy(rtype);
+  memory->destroy(rq);
+  memory->destroy(bond_ratom);
+  memory->destroy(angle_ratom);
+  memory->destroy(dihedral_ratom);
+  memory->destroy(improper_ratom);
 }
 
 /* ----------------------------------------------------------------------

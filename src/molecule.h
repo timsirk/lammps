@@ -111,7 +111,34 @@ class Molecule : protected Pointers {
 
   double *quat_external;   // orientation imposed by external class
                            // e.g. FixPour or CreateAtoms
-  
+ 
+  // for rxn template
+  int nrtypes,nrbonds,nrangles,nrdihedrals,nrimpropers; 
+  int *rtype;
+  double *rq;
+
+  int *num_rbond;
+  int **bond_rtype;
+  tagint **bond_ratom;
+
+  int *num_rangles;
+
+  int *num_rdihedral;
+  tagint **angle_ratom;
+
+  int rtypeflag,rqflag;
+
+  //nt **dihedral_rtype;
+  //tagint **dihedral_ratom1,**dihedral_ratom2,**dihedral_ratom3,**dihedral_ratom4;
+  tagint **dihedral_ratom;
+
+  int *num_rimproper;
+  //int **improper_rtype;
+  //tagint **improper_ratom1,**improper_ratom2,**improper_ratom3,**improper_ratom4;
+  tagint **improper_ratom;
+
+  void rread(int, char *);
+
   Molecule(class LAMMPS *, int, char **, int &);
   ~Molecule();
   void compute_center();
