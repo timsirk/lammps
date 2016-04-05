@@ -78,7 +78,7 @@ Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
   // zero 
   for (int i = 0; i < atom->nmax; i++) 
      zeroes[i] = 0; 
-
+/*
   int ndx = group->find("dissipate");
   if(ndx > 0){
      gbit = group->bitmask[group->find("dissipate")];
@@ -86,7 +86,7 @@ Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
   }
   else 
      error->one(FLERR,"dissipate group is required for topo command");
-
+*/
   // hash for reaction atom types and reaction charges
   // memory->grow(rtypes,atom->ntypes,2,"topo:rtypes");
   // printf("ntypes %d \n",atom->ntypes);
@@ -157,12 +157,14 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   // allocate and initialize deletion list
   memory->create(dlist,nlocal,"topo:dlist");
 
+/*
      // clear the older atoms from dissipate group
   for (int i = 0; i < nlocal; i++){
      dlist[i] = 0;
      //atom->mask[i] = 0;
      //atom->mask[i] &= igbit;
   }
+*/
  // settings
     if (onemol->nrangles > 0)
       angleflag = 1;
@@ -314,7 +316,7 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   update_topology();
 
   // delete if type -1
-  delete_atom();
+  //delete_atom();
 
   comm->forward_comm();
 
@@ -479,7 +481,7 @@ done:
 
       atom->type[i] = onemol->rtype[atom->type[i]-1];
       // add to influenced group
-      atom->mask[i] |= gbit;
+      //atom->mask[i] |= gbit;
     }
 
   // delete any atoms with type -1
