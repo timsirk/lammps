@@ -462,8 +462,7 @@ void Molecule::read(int flag)
     else if (strstr(line,"rangles")) sscanf(line,"%d",&nrangles);
     else if (strstr(line,"rdihedrals")) sscanf(line,"%d",&nrdihedrals);
     else if (strstr(line,"rimpropers")) sscanf(line,"%d",&nrimpropers);
-
-    if (strstr(line,"atoms")) sscanf(line,"%d",&natoms);
+    else if (strstr(line,"atoms")) sscanf(line,"%d",&natoms);
     else if (strstr(line,"bonds")) sscanf(line,"%d",&nbonds);
     else if (strstr(line,"angles")) sscanf(line,"%d",&nangles);
     else if (strstr(line,"dihedrals")) sscanf(line,"%d",&ndihedrals);
@@ -507,8 +506,8 @@ void Molecule::read(int flag)
   }
 
   // error checks
-
-  if (natoms < 1) error->all(FLERR,"No count or invalid atom count in molecule file");
+  // relax this check since don't need atoms
+  //if (natoms < 1) error->all(FLERR,"No count or invalid atom count in molecule file");
   if (nbonds < 0) error->all(FLERR,"Invalid bond count in molecule file");
   if (nangles < 0) error->all(FLERR,"Invalid angle count in molecule file");
   if (ndihedrals < 0)
