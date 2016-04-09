@@ -451,6 +451,99 @@ of SHAKE clusters.
 
 :line
 
+The molecule command can also define a reaction template. A reaction template describes the way in which the local environment near a newly created or broken bond is updated by a fix or command. Currently only "fix_bond_create"_fix_bond_create.html and "fix_bond_break"_fix_bond_break.html support reaction templates. 
+
+When a new bond is created, the bond type and any changes to the environment near the bond are determined by scanning the atom types of a set of nearby atoms called {influenced atoms}. The influenced atoms include only the two atoms in the new bond ({i}, {j}) and the 1-2 and 1-3 bond neighbors of {i} and {j}. New 3-body interactions (angle) and 4-body (dihedral, improper) interactions are inferred from the influenced atoms. A new bond is added only if its sequence of atom types is found on reaction template in the {RBonds} section. Likewise, an inferred angle, dihedral or improper will be added only if it is matched in the {RAngles}, {RDihedrals} or {RImpropers} sections. Further, the atom types and charges of influenced atoms are updated to the new values given in the {RTypes} and {RCharges} sections of the reaction template. 
+
+IMPORTANT NOTE: The data structures within LAMMPS that store bond topology are updated to reflect the creation of the new bonds, angles, etc. The internal LAMMPS data structures that store this information must have space for it. The "extra bond per atom" parameter must be set in the data file to allow space for any new bonds that are created. Ditto for "extra angle per atom", "extra dihedral per atom", and "extra improper per atom" if angles, dihedrals, or impropers are being added as new bonds are created. See the "fix_bond_create"_fix_bond_create.html, "read_data"_read_data.html or "create_box"_create_box.html command for more details. 
+
+Only one reaction template should be given per file. The meaning of the fields in the reaction template are given below. 
+
+These are the header keywords.  
+  
+Nt {rtypes} = # of atom types Nt in the system, default = 0
+Nb {rbonds} = # of bond patterns Nb to search, default = 0 
+Na {rangles} = # of angle patterns Na to search, default = 0 
+Nd {rdihedrals} = # of dihedral patterns Nd to search, default = 0 
+Ni {rimpropers} = # of improper patterns Ni to search, default = 0 :ul
+
+The body of the file can contain the sections described below. Sections can appear in any order. 
+
+{RTypes} = updates the atom types of influenced atoms 
+{RCharges} = updates the charges of influenced atoms
+{RBonds}, {RAngles}, {RDihedrals},{RImpropers}  = topology type matching sections for bond, angle, dihedral, impropers :ul
+
+Each section and its format are listed below. 
+
+:line
+
+{RTypes} section:
+
+one line per atom type
+line syntax: type1 type2
+type1 = current atom type 
+type2 = updated atom type :ul
+
+After a bond is formed, the atom type of an influenced atom is updated from type1 to type2. The lines are assumed to be listed in order from 1 to N atom types, but LAMMPS does not check for this.
+
+:line
+
+{RCharges} section:
+
+one line per atom type
+line syntax: type1 q
+type1 = current atom type
+q = updated charge :ul
+
+After a bond is formed, the charge of an influenced atom of type1 is updated to q. The lines are assumed to be listed in order from 1 to N atom types, but LAMMPS does not check for this.
+
+:line
+
+{RBonds} section:
+
+one line per pair of atom types that should form bonds
+line syntax: ID type atomtype1 atomtype2
+type = bond type 
+atomtype1, atomtype2 = current types of atoms that form bonds :ul
+
+If the atoms of a proposed bond {ij} (or {ji}) have atom types that match an entry in the {RBonds} section, a new bond is created for atoms {ij} with the {type} from the matching entry. If no match is found, the bond is not created and no updates are made to the influenced atoms. 
+
+:line
+
+{RAngles} section:
+
+one line per triplet of atom types that should form angles
+line syntax: ID type atomtype1 atomtype2 atomtype3
+type = angle type
+atomtype1, atomtype2, atomtype3 = current types of atoms that form angles :ul
+
+New angle interactions are inferred between atoms {ijk}, where {i} and {j} are the newly bonded atoms and {k} is any of the 1-2 neighbors of {i} and {j}. If atoms of an inferred angle {ijk} (or {kji}) have atom types 
+that match an entry in the {RAngles} section, a new angle is created for atoms {ijk} with the {type} from the matching entry. If no match is found, the angle is not created.
+
+:line
+
+{RDihedrals} section:
+
+one line per quad of atom types that should form dihedrals 
+line syntax: ID type atomtype1 atomtype2 atomtype3 atomtype4
+type = dihedral type 
+atomtype1, atomtype2, atomtype3, atomtype4 = current types of atoms that form dihedrals :ul
+
+New dihedral interactions are inferred between atoms {ijkl} and {kijl}, where {k} and {l} are the 1-2 and 1-3 neighbors of {i} and {j}. If the atom types of an inferred dihedral {ijkl} (or {lkji}) or {kijl} (or {ljik}) match an entry in the {RDihedrals} section, a new dihedral is created for those atoms with the {type} from the matching entry. If no match is found, the dihedral is not created. In the case of multiple matches, a new dihedral is created only if {type} is unique from the previous matches. 
+
+:line
+
+{RImpropers} section:
+
+one line per quad of atom types that should form impropers
+line syntax: ID type atomtype1 atomtype2 atomtype3 atomtype4
+type = improper type 
+atomtype1, atomtype2, atomtype3, atomtype4 = current types of atoms that form impropers :ul
+
+New improper interactions are inferred between atoms {ijkl}, where {j} is the central atom and {i}, {k} and {l} are the 1-2 neighbors of {j}. If the atom types of an inferred improper {ijkl} or {lkji} match an entry in the {RImpropers} section, a new improper is created for atoms {ijkl} with the {type} from the matching entry. If no match is found, the improper is not created. 
+
+:line
+
 [Restrictions:] none
 
 [Related commands:]
