@@ -621,21 +621,29 @@ void Molecule::read(int flag)
     } else if (strcmp(keyword,"RBonds") == 0) {
       if (nrbonds == 0)
 	error->all(FLERR,"Molecule file has rbonds but no nrbonds setting");
+      if (!atom->avec->bonds_allow) 
+	error->all(FLERR,"No bonds allowed");
         if (flag) rread(2,line);
         else skip_lines(nrbonds,line);
     } else if (strcmp(keyword,"RAngles") == 0) {
       if (nrangles == 0)
 	error->all(FLERR,"Molecule file has rangles but no nrangles setting");
+      if (!atom->avec->angles_allow) 
+	error->all(FLERR,"No angles allowed");
         if (flag) rread(3,line);
         else skip_lines(nrangles,line);
     } else if (strcmp(keyword,"RDihedrals") == 0) {
       if (nrdihedrals == 0)
 	error->all(FLERR,"Molecule file has rdihedrals but no nrdiherals setting");
+      if (!atom->avec->dihedrals_allow) 
+	error->all(FLERR,"No dihedrals allowed");
         if (flag) rread(4,line);
         else skip_lines(nrdihedrals,line);
     } else if (strcmp(keyword,"RImpropers") == 0) {
       if (nrimpropers == 0)
 	error->all(FLERR,"Molecule file has rimpropers but no nrimpropers setting");
+      if (!atom->avec->impropers_allow) 
+	error->all(FLERR,"No impropers allowed");
         if (flag) rread(5,line);
         else skip_lines(nrimpropers,line);
     } else error->one(FLERR,"Unknown section in molecule file");

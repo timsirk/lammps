@@ -10,10 +10,6 @@
 
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
-//#ifdef COMMAND_CLASS
-//CommandStyle(topo,Topo)
-//#else
-
 #ifndef LMP_TOPO_H
 #define LMP_TOPO_H
 
@@ -26,12 +22,8 @@ class Topo : protected Pointers {
  Topo(class LAMMPS *);
  ~Topo();
   int printBonds(bigint, int**);
-  //int create_bonds(int, Modify*, Molecule*);
-  int create_bonds(int, int*, Molecule*);
-//  void command(int, char **);
-
+  int change_bonds(int, int*, Molecule*);
   class Molecule *onemol;
-  //class Fix *topofix;
 
   // for topo manipulation
   void check_ghosts();
@@ -73,12 +65,10 @@ private:
   tagint lastcheck;
   int *dlist;
   int gbit, igbit;
-  //int **rtypes;
 
   double **test;
   // union data struct for packing 32-bit and 64-bit ints into double bufs
   // see atom_vec.h for documentation
-  // need for ring comm
   union ubuf {
     double d;
     int64_t i;
@@ -102,4 +92,3 @@ private:
 }
 
 #endif
-//#endif

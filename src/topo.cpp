@@ -48,7 +48,6 @@ Topo *Topo::cptr;
 /* ---------------------------------------------------------------------- */
 Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
 
-//printf("Topo create bonds \n");
   // this arr/y not atom-based, grow later as needed
   influencedlist = NULL;
   maxinfluenced = DELTA;
@@ -73,30 +72,14 @@ Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
   int maxspecial = atom->maxspecial;
   copy = new tagint[maxspecial*maxspecial + maxspecial];
 
-  int* zeroes = NULL;
-  memory->grow(zeroes,atom->nmax,"topo:zeroes");
-  // zero 
-  for (int i = 0; i < atom->nmax; i++) 
-     zeroes[i] = 0; 
-/*
-  int ndx = group->find("dissipate");
-  if(ndx > 0){
-     gbit = group->bitmask[group->find("dissipate")];
-     igbit = group->inversemask[group->find("dissipate")];
-  }
-  else 
-     error->one(FLERR,"dissipate group is required for topo command");
-*/
-  // hash for reaction atom types and reaction charges
-  // memory->grow(rtypes,atom->ntypes,2,"topo:rtypes");
-  // printf("ntypes %d \n",atom->ntypes);
+  // future could add hash for reaction atom types and reaction charges
+  // instead of listing each type in the rxn template
 }
 /* ---------------------------------------------------------------------- */
 Topo::~Topo(){
 
   if(influencedlist)
     memory->destroy(influencedlist);
-  //if(onemol) memory->destroy(onemol);
   delete [] copy;
 }
 /* ----------------------------------------------------------------------
@@ -114,11 +97,9 @@ created = bond;
 }
 
 /* ----------------------------------------------------------------------
-create bonds
+update the bonds, angles, dih, impr, types, charges 
 ------------------------------------------------------------------------- */
-//int Topo::create_bonds(int nbond, int** bond, Molecule *mymol)
-//int Topo::create_bonds(int nbond, Fix *topofix, Molecule *mymol)
-int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
+int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
 {
 
   // flag 0 delete bonds
@@ -157,14 +138,6 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   // allocate and initialize deletion list
   memory->create(dlist,nlocal,"topo:dlist");
 
-/*
-     // clear the older atoms from dissipate group
-  for (int i = 0; i < nlocal; i++){
-     dlist[i] = 0;
-     //atom->mask[i] = 0;
-     //atom->mask[i] &= igbit;
-  }
-*/
  // settings
     if (onemol->nrangles > 0)
       angleflag = 1;
@@ -198,17 +171,15 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
 
       if (!newton_bond || tag[i] < tag[j]) {
         if (num_bond[i] == atom->bond_per_atom)
-          error->all(FLERR,"New bond exceeded bonds per atom in fix bond/create");
+          error->all(FLERR,"New bond exceeded bonds per atom in topo command");
 
       btype = check_btype(i,j);
-        //printf(" btype %d\n",btype);
-     if(!btype)
-       continue; 
-      //btype = 1;
+      if(!btype)
+        continue; 
+
       bond_type[i][num_bond[i]] = btype;
       bond_atom[i][num_bond[i]] = tag[j];
       num_bond[i]++;
-      //printf(" i %d tag %d now has %d bonds \n", i, atom->tag[i],num_bond[i]);
     }    
 
     // add a 1-2 neighbor to special bond list for atom I
@@ -229,7 +200,7 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
     }    
     if (n3 == atom->maxspecial)
       error->one(FLERR,
-                 "New bond exceeded special list size in fix bond/create");
+                 "New bond exceeded special list size in topo command");
     for (m = n3; m > n1; m--) slist[m] = slist[m-1];
     slist[n1] = tag[j];
     nspecial[i][0] = n1+1;
@@ -298,6 +269,11 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   for (i = 0; i < nall; i++) {
     if (finalpartner[i] == 0) continue;
     j = atom->map(finalpartner[i]);
+
+    btype = check_btype(i,j);
+    if(!btype)
+      continue; 
+
     if (j < 0 || tag[i] < tag[j]) {
       if (ncreate == maxcreate) {
         maxcreate += DELTA;
@@ -319,21 +295,6 @@ int Topo::create_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   //delete_atom();
 
   comm->forward_comm();
-
-/*
-if( me == 0){
-  printf("final special\n ");
-
-  for (i = 0; i < nall; i++){ 
-    ns = nspecial[i][2];
-    printf("gid %d nspecial %d %d %d : ",atom->tag[i], (int) nspecial[i][0], (int) nspecial[i][1], (int) nspecial[i][2]);
-    for (j = 0; j < ns; j++){ 
-      printf("%d ",(int) special[i][j]);
-    }
-      printf("\n ");
-  }
-}
-*/
 
   return 0;
 }
@@ -422,18 +383,16 @@ void Topo::update_topology()
     }
 
 done:
-   // rebuild_special first, since used by create_angles, etc
-//printf("proc: %d mark3 \n", me);
 
+   // rebuild_special first, since used by create_angles, etc
     if (influence) {
 
       // delete atom and its topology
       // i is local to this proc 
-
-      if(onemol->rtype[atom->type[i]-1] == -1){
-        dlist[i] = 1;
-        continue;
-      }
+      //if(onemol->rtype[atom->type[i]-1] == -1){
+      //  dlist[i] = 1;
+      //  continue;
+      //}
 
         rebuild_special(i);
 
@@ -456,32 +415,25 @@ done:
           break_impropers(i,id1,id2);
       }
 
-//printf("saving inflence atom %d by bond %d %d\n",tag[i], id1, id2);
         influencedlist[ninfluenced++] = i;
-//printf("saved inflence atom %d by bond %d %d\n",tag[i], id1, id2);
         if(ninfluenced == maxinfluenced){  
-//printf("growing memory at inflence atom %d by bond %d %d\n",tag[i], id1, id2);
           maxinfluenced += DELTA;
           memory->grow(influencedlist, maxinfluenced, "topo:influencedlist");
         }
-//printf("end inflence atom %d by bond %d %d\n",tag[i], id1, id2);
     }
   }
 
-//printf("proc: %d mark4 \n", me);
   // update atom types for influenced atoms 
   // must be done after angle, dih, impro are matched
 
     for (int ii = 0; ii < ninfluenced; ii++) {
 
       i = influencedlist[ii];
-        // charge update
+      // charge update
       if (atom->q_flag)
         atom->q[i] = onemol->rq[atom->type[i]-1];
-
+      // type update
       atom->type[i] = onemol->rtype[atom->type[i]-1];
-      // add to influenced group
-      //atom->mask[i] |= gbit;
     }
 
   // delete any atoms with type -1
@@ -527,7 +479,6 @@ done:
     else
       atom->nimpropers -= all;
   }
-
 }
 
 /* ----------------------------------------------------------------------
@@ -546,13 +497,10 @@ void Topo::rebuild_special(int m)
   tagint **special = atom->special;
 
   // existing 1-2 neighs of atom M
-//printf(" check 0\n");
   slist = special[m];
   n1 = nspecial[m][0];
 
   cn1 = 0;
-
-//printf("proc: %d mark4a \n", me);
 
   for (i = 0; i < n1; i++)
     copy[cn1++] = slist[i];
@@ -573,9 +521,6 @@ void Topo::rebuild_special(int m)
       if (slist[j] != tag[m]) copy[cn2++] = slist[j];
   }
 
-
-//printf("proc: %d mark4c \n", me);
-//printf(" check 1\n");
   cn2 = dedup(cn1,cn2,copy);
   if (cn2 > atom->maxspecial)
     error->one(FLERR,"Special list size exceeded in Topo command");
@@ -600,13 +545,10 @@ void Topo::rebuild_special(int m)
     error->one(FLERR,"Special list size exceeded in Topo command");
 
   // store new special list with atom M
-
-//printf("proc: %d mark4d \n", me);
   nspecial[m][0] = cn1;
   nspecial[m][1] = cn2;
   nspecial[m][2] = cn3;
   memcpy(special[m],copy,cn3*sizeof(int));
-//printf(" check 3\n");
 }
 
 /* ----------------------------------------------------------------------
@@ -644,11 +586,6 @@ void Topo::create_angles(int m)
   n2 = nspecial[m][0];
   s2list = special[m];
 
-//printf("\ncreate_angles: i2 %d (%d) n2-slist %d slist:", i2, type[atom->map(i2)], n2);
-  //for (i = 0; i < n2; i++)
-//    printf("%d (%d)", s2list[i], type[atom->map(s2list[i])]);
-  
-
   for (i = 0; i < n2; i++) {
     i1 = s2list[i];
     for (j = i+1; j < n2; j++) {
@@ -666,12 +603,7 @@ void Topo::create_angles(int m)
 
       // 0 if not present
       // angle number if present
-//        printf(" id %d %d %d\n",i1, i2, i3);
-//        printf(" ty %d %d %d\n",type[atom->map(i1)], type[atom->map(i2)], type[atom->map(i3)]);
-//          printf(" check %d %d %d\n",atom->type[atom->map(i1)], atom->type[atom->map(i2)], atom->type[atom->map(i3)]);
         atype = check_atype(i1,i2,i3); 
-//        printf(" atype %d\n",atype);
-//        printf(" failed %d %d %d\n",atom->type[atom->map(i1)], atom->type[atom->map(i2)], atom->type[atom->map(i3)]);
         if(!atype) continue; 
 
       if (num_angle < atom->angle_per_atom) {
@@ -800,7 +732,6 @@ void Topo::create_dihedrals(int m)
         if (n < ncreate) {
           // check types 
             dcheck = check_dtype(i1,i2,i3,i4,dihedrals); 
-//            printf("checked: %d %d %d %d value: %d\n",atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)], dcheck);
             if(!dcheck)
               continue; 
 
@@ -815,7 +746,6 @@ void Topo::create_dihedrals(int m)
             dihedral_atom2[num_dihedral] = i2;
             dihedral_atom3[num_dihedral] = i3;
             dihedral_atom4[num_dihedral] = i4;
-//            printf("mult %d type %d: %d %d %d %d\n", dihedrals[0],dtype,atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)]);
             num_dihedral++;
             ndihedrals++;
           } else overflow = 1; 
@@ -853,7 +783,6 @@ void Topo::create_dihedrals(int m)
 
           // check types 
             dcheck = check_dtype(i3,i2,i1,i4,dihedrals); 
-//            printf("checked: %d %d %d %d value: %d\n",atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)], dcheck);
             if(!dcheck)
               continue; 
 
@@ -868,7 +797,6 @@ void Topo::create_dihedrals(int m)
             dihedral_atom2[num_dihedral] = i2;
             dihedral_atom3[num_dihedral] = i1;
             dihedral_atom4[num_dihedral] = i4;
-//            printf("mult %d type %d: %d %d %d %d\n", dihedrals[0],dtype,atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)]);
             num_dihedral++;
             ndihedrals++;
           } else overflow = 1; 
@@ -919,7 +847,6 @@ void Topo::create_dihedrals(int m)
 
           // check types 
             dcheck = check_dtype(i1,i2,i3,i4,dihedrals); 
-//            printf("checked: %d %d %d %d value: %d\n",atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)], dcheck);
             if(!dcheck)
               continue; 
         // dihedrals zero index has number
@@ -933,7 +860,6 @@ void Topo::create_dihedrals(int m)
             dihedral_atom2[num_dihedral] = i2;
             dihedral_atom3[num_dihedral] = i3;
             dihedral_atom4[num_dihedral] = i4;
-//            printf("mult %d type %d: %d %d %d %d\n", dihedrals[0],dtype,atom->type[atom->map(i1)], atom->type[atom->map(i2)],atom->type[atom->map(i3)],atom->type[atom->map(i4)]);
             num_dihedral++;
             ndihedrals++;
           } else overflow = 1;
@@ -1001,10 +927,8 @@ void Topo::create_impropers(int m)
         }
         if (n == ncreate) continue;
 
-        // NOTE: this is place to check atom types of i1,i2,i3,i4
-
-            itype = check_itype(i1,i2,i3,i4); 
-            if(!itype) continue; 
+        itype = check_itype(i1,i2,i3,i4); 
+        if(!itype) continue; 
 
         if (num_improper < atom->improper_per_atom) {
           improper_type[num_improper] = itype;
@@ -1054,10 +978,8 @@ void Topo::create_impropers(int m)
         }
         if (n < ncreate) {
 
-          // NOTE: this is place to check atom types of i3,i2,i1,i4
-
-            itype = check_itype(i3,i2,i1,i4); 
-            if(!itype) continue; 
+          itype = check_itype(i3,i2,i1,i4); 
+          if(!itype) continue; 
 
           if (num_improper < atom->improper_per_atom) {
             improper_type[num_improper] = dtype;
@@ -1141,7 +1063,6 @@ int Topo::check_atype(int i1, int i2, int i3)
   int i1type = type[atom->map(i1)];
   int i2type = type[atom->map(i2)];
   int i3type = type[atom->map(i3)];
-//   printf("checked angle: %d %d %d\n", i1type, i2type, i3type);
 
   // look up angles by atom type using molecule template
   // molecule template contains atom types
@@ -1225,12 +1146,7 @@ for(i = 1; i < Nc; i++)
 // store number of dihedral types
 dihedrals[0] = Nc - 1; 
 
-// debug
-//for(int zzz = 0; zzz < Nc; zzz++)
-//  printf("Nc=%d value %d\n",Nc,dihedrals[zzz]);
-
 return nfound;
-
 }
 
 /* ---------------------------------------------------------------------- 
@@ -1273,25 +1189,8 @@ int Topo::check_itype(int i1, int i2, int i3, int i4)
 
   // no match
   return 0;
-
 }
 
-/* ----------------------------------------------------------------------
-test if this atom type is in the template
-----------------------------------------------------------------------*/
-/*
-void Topo::check_atom(i1)
-{
-  int* type = atom->type;
-  int i1type = type[atom->map(i1)];
-  int i1t = i1type - 1;
-    for (int m = 0; m < ntypes[i2t]; m++){
-      if ([i2t][m] == i1type) 
-    }
-
-  return 0;
-}
-*/
 /* ----------------------------------------------------------------------
    insure all atoms 2 hops away from owned atoms are in ghost list
    this allows dihedral 1-2-3-4 to be properly created
@@ -1325,249 +1224,11 @@ void Topo::check_ghosts()
 }
 
 /* ----------------------------------------------------------------------
-remove influenced atoms if local 
+remove influenced atoms if local and rxn type -1 
 ------------------------------------------------------------------------- */
-void Topo::delete_atom()
-{
-
-//printf(" tried to delete %d\n", atom->tag[i]);
-
-  // optionally delete additional bonds or atoms in molecules
-  // hash = for atom IDs being deleted by one processor
-  // list of these IDs is sent around ring
-  // at each stage of ring pass, hash is re-populated with received IDs
-
-
-  // delete bonds, angles, etc for atoms in dlist
-
-  hash = new std::map<tagint,int>();
-
-  // list = set of unique molecule IDs from which I deleted atoms
-  // pass list to all other procs via comm->ring()
-
-  tagint *tag = atom->tag;
-  int nlocal = atom->nlocal;
-
-  int n = 0;
-  for (int i = 0; i < nlocal; i++)
-    if (dlist[i]) n++;
-
-  tagint *list;
-  memory->create(list,n,"topo:list");
-
-  n = 0;
-  for (int i = 0; i < nlocal; i++)
-    if (dlist[i]) list[n++] = tag[i];
-
-  cptr = this;
-  comm->ring(n,sizeof(tagint),list,1,bondring,NULL);
-
-  delete hash;
-
-  // delete atoms 
-
-  AtomVec *avec = atom->avec;
-  int i = 0;
-
-  // delete local atoms flagged in dlist
-  while (i < nlocal) {
-    if (dlist[i]) {
-      avec->copy(nlocal-1,i,1);
-      dlist[i] = dlist[nlocal-1];
-      nlocal--;
-    } else i++;
-  }
-
-  // reset nlocal
-  atom->nlocal = nlocal;
-  // clean up
-  memory->destroy(dlist);
-
-  // reset atom->natoms and also topology counts
-  // reset atom->map if it exists
-  // set nghost to 0 so old ghosts of deleted atoms won't be mapped
-
-  bigint nblocal = atom->nlocal;
-  MPI_Allreduce(&nblocal,&atom->natoms,1,MPI_LMP_BIGINT,MPI_SUM,world);
-  if (atom->map_style) {
-    atom->nghost = 0;
-    atom->map_init();
-    atom->map_set();
-  }
-
-  // recount the bonds, angles, etc
-
-  bigint nbonds = 0;
-  bigint nangles = 0;
-  bigint ndihedrals = 0;
-  bigint nimpropers = 0;
-
-  if (atom->molecular == 1) {
-    int *num_bond = atom->num_bond;
-    int *num_angle = atom->num_angle;
-    int *num_dihedral = atom->num_dihedral;
-    int *num_improper = atom->num_improper;
-    int nlocal = atom->nlocal;
-
-    for (int i = 0; i < nlocal; i++) {
-      if (num_bond) nbonds += num_bond[i];
-      if (num_angle) nangles += num_angle[i];
-      if (num_dihedral) ndihedrals += num_dihedral[i];
-      if (num_improper) nimpropers += num_improper[i];
-    }
-
-  } 
-    else if (atom->molecular == 2) {
-    Molecule **onemols = atom->avec->onemols;
-    int *molindex = atom->molindex;
-    int *molatom = atom->molatom;
-    int nlocal = atom->nlocal;
-
-    int imol,iatom;
-
-    for (int i = 0; i < nlocal; i++) {
-      imol = molindex[i];
-      iatom = molatom[i];
-      nbonds += onemols[imol]->num_bond[iatom];
-      nangles += onemols[imol]->num_angle[iatom];
-      ndihedrals += onemols[imol]->num_dihedral[iatom];
-      nimpropers += onemols[imol]->num_improper[iatom];
-    }
-  }
-
-  if (atom->avec->bonds_allow) {
-    MPI_Allreduce(&nbonds,&atom->nbonds,1,MPI_LMP_BIGINT,MPI_SUM,world);
-    if (!force->newton_bond) atom->nbonds /= 2;
-  }
-  if (atom->avec->angles_allow) {
-    MPI_Allreduce(&nangles,&atom->nangles,1,MPI_LMP_BIGINT,MPI_SUM,world);
-    if (!force->newton_bond) atom->nangles /= 3;
-  }
-  if (atom->avec->dihedrals_allow) {
-    MPI_Allreduce(&ndihedrals,&atom->ndihedrals,1,MPI_LMP_BIGINT,MPI_SUM,world);
-    if (!force->newton_bond) atom->ndihedrals /= 4;
-  }
-  if (atom->avec->impropers_allow) {
-    MPI_Allreduce(&nimpropers,&atom->nimpropers,1,MPI_LMP_BIGINT,MPI_SUM,world);
-    if (!force->newton_bond) atom->nimpropers /= 4;
-  }
-}
-
-/* ----------------------------------------------------------------------
-   callback from comm->ring() 
-------------------------------------------------------------------------- */
-
-void Topo::bondring(int nbuf, char *cbuf)
-{
-  tagint *list = (tagint *) cbuf;
-  std::map<tagint,int> *hash = cptr->hash;
-
-  int *num_bond = cptr->atom->num_bond;
-  int *num_angle = cptr->atom->num_angle;
-  int *num_dihedral = cptr->atom->num_dihedral;
-  int *num_improper = cptr->atom->num_improper;
-
-  int **bond_type = cptr->atom->bond_type;
-  tagint **bond_atom = cptr->atom->bond_atom;
-
-  int **angle_type = cptr->atom->angle_type;
-  tagint **angle_atom1 = cptr->atom->angle_atom1;
-  tagint **angle_atom2 = cptr->atom->angle_atom2;
-  tagint **angle_atom3 = cptr->atom->angle_atom3;
-
-  int **dihedral_type = cptr->atom->dihedral_type;
-  tagint **dihedral_atom1 = cptr->atom->dihedral_atom1;
-  tagint **dihedral_atom2 = cptr->atom->dihedral_atom2;
-  tagint **dihedral_atom3 = cptr->atom->dihedral_atom3;
-  tagint **dihedral_atom4 = cptr->atom->dihedral_atom4;
-
-  int **improper_type = cptr->atom->improper_type;
-  tagint **improper_atom1 = cptr->atom->improper_atom1;
-  tagint **improper_atom2 = cptr->atom->improper_atom2;
-  tagint **improper_atom3 = cptr->atom->improper_atom3;
-  tagint **improper_atom4 = cptr->atom->improper_atom4;
-
-  int nlocal = cptr->atom->nlocal;
-
-  // cbuf = list of N deleted atom IDs from other proc, put them in hash
-
-  hash->clear();
-  for (int i = 0; i < nbuf; i++) (*hash)[list[i]] = 1;
-
-  // loop over my atoms and their bond topology lists
-  // if any atom in an interaction matches atom ID in hash, delete interaction
-
-  int m,n;
-  for (int i = 0; i < nlocal; i++) {
-    if (num_bond) {
-      m = 0;
-      n = num_bond[i];
-      while (m < n) {
-        if (hash->find(bond_atom[i][m]) != hash->end()) {
-          bond_type[i][m] = bond_type[i][n-1];
-          bond_atom[i][m] = bond_atom[i][n-1];
-          n--;
-        } else m++;
-      }
-      num_bond[i] = n;
-    }
-
-    if (num_angle) {
-      m = 0;
-      n = num_angle[i];
-      while (m < n) {
-        if (hash->find(angle_atom1[i][m]) != hash->end() ||
-            hash->find(angle_atom2[i][m]) != hash->end() ||
-            hash->find(angle_atom3[i][m]) != hash->end()) {
-          angle_type[i][m] = angle_type[i][n-1];
-          angle_atom1[i][m] = angle_atom1[i][n-1];
-          angle_atom2[i][m] = angle_atom2[i][n-1];
-          angle_atom3[i][m] = angle_atom3[i][n-1];
-          n--;
-        } else m++;
-      }
-      num_angle[i] = n;
-    }
-
-    if (num_dihedral) {
-      m = 0;
-      n = num_dihedral[i];
-      while (m < n) {
-        if (hash->find(dihedral_atom1[i][m]) != hash->end() ||
-            hash->find(dihedral_atom2[i][m]) != hash->end() ||
-            hash->find(dihedral_atom3[i][m]) != hash->end() ||
-            hash->find(dihedral_atom4[i][m]) != hash->end()) {
-          dihedral_type[i][m] = dihedral_type[i][n-1];
-          dihedral_atom1[i][m] = dihedral_atom1[i][n-1];
-          dihedral_atom2[i][m] = dihedral_atom2[i][n-1];
-          dihedral_atom3[i][m] = dihedral_atom3[i][n-1];
-          dihedral_atom4[i][m] = dihedral_atom4[i][n-1];
-          n--;
-        } else m++;
-      }
-      num_dihedral[i] = n;
-    }
-
-    if (num_improper) {
-      m = 0;
-      n = num_improper[i];
-      while (m < n) {
-        if (hash->find(improper_atom1[i][m]) != hash->end() ||
-            hash->find(improper_atom2[i][m]) != hash->end() ||
-            hash->find(improper_atom3[i][m]) != hash->end() ||
-            hash->find(improper_atom4[i][m]) != hash->end()) {
-          improper_type[i][m] = improper_type[i][n-1];
-          improper_atom1[i][m] = improper_atom1[i][n-1];
-          improper_atom2[i][m] = improper_atom2[i][n-1];
-          improper_atom3[i][m] = improper_atom3[i][n-1];
-          improper_atom4[i][m] = improper_atom4[i][n-1];
-          n--;
-        } else m++;
-      }
-      num_improper[i] = n;
-    }
-  }
-}
+//void Topo::delete_atom()
+//{
+//}
 
 /* ----------------------------------------------------------------------
    break any angles owned by atom M that include atom IDs 1 and 2
@@ -1646,10 +1307,8 @@ void Topo::break_dihedrals(int m, tagint id1, tagint id2)
       ndihedrals++;
     }
   }
-
   atom->num_dihedral[m] = num_dihedral;
 }
-
 
 /* ----------------------------------------------------------------------
    break any impropers owned by atom M that include atom IDs 1 and 2
@@ -1695,7 +1354,7 @@ void Topo::break_impropers(int m, tagint id1, tagint id2)
 
 
 /* ----------------------------------------------------------------------
-   delete all topology interactions that include deleted atoms
+   comm to update special lists 
 ------------------------------------------------------------------------- */
 
 void Topo::comm_special()
@@ -1742,32 +1401,13 @@ void Topo::comm_special()
 
   // unpack special
   for (i = nlocal; i < nall; i++){
-    nspecial[i][0] = (int)test[i][0];
-    nspecial[i][1] = (int)test[i][0];
-    nspecial[i][2] = (int)test[i][0];
+    nspecial[i][0] = (int) ubuf(test[i][0]).i;
+    nspecial[i][1] = (int) ubuf(test[i][0]).i;
+    nspecial[i][2] = (int) ubuf(test[i][0]).i;
     ns = nspecial[i][0];
-//    printf("unpacked ns %d \n",ns);
-//    printf("gid %d special ",atom->tag[i], (int) special[i][j-1]);
     for (j = 1; j <= ns; j++){
-      special[i][j-1] = (int)test[i][j];
-//    printf("\n nlocal: %d i: %d num: %d: ",nlocal,i,(int)test[i][0]);
-      //printf("%d ",(int) special[i][j-1]);
+      special[i][j-1] = (int) ubuf(test[i][j]).i;
     }
-//      printf("\n ");
   }
-
 }
 
-/* ----------------------------------------------------------------------
-   callback from comm->ring() 
-------------------------------------------------------------------------- */
-/*
-void Topo::specialring(int nbuf, char *cbuf)
-{
-
-  // n atoms on this proc in new bonds
-  // send special neighs for those around ring
-
-
-}
-*/

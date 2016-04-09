@@ -593,10 +593,9 @@ void FixBondCreateRxn::post_integrate()
 
   // topo handles the rest
   if(topoflag){
-    topo->create_bonds(1, finalpartner, onemol);
+    topo->change_bonds(1, finalpartner, onemol);
     return;
   }
-
 
   // create list of broken bonds that influence my owned atoms
   //   even if between owned-ghost or ghost-ghost atoms

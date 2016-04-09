@@ -382,7 +382,7 @@ void FixBondBreakRxn::post_integrate()
 
   // topo handles the rest
   if(topoflag){
-    topo->create_bonds(0, finalpartner, onemol);
+    topo->change_bonds(0, finalpartner, onemol);
     return;
   }
 
