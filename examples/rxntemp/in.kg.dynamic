@@ -1,0 +1,55 @@
+# FENE bead spring 
+
+units		lj
+atom_style molecular	
+special_bonds lj/coul 0.0 1.0 1.0
+
+read_data	data.eq
+
+neighbor	0.4 bin
+neigh_modify	every 1 delay 1
+comm_modify cutoff 5.0
+
+# FF
+pair_style	lj/cut 1.12
+pair_modify	shift yes
+pair_coeff	* * 1.0 1.0 1.12
+
+bond_style fene 
+bond_coeff	* 30.0 1.5 1.0 1.0
+
+angle_style     harmonic
+angle_coeff	1 1.0 180
+
+dihedral_style     harmonic
+dihedral_coeff	1 1.0 1 2
+
+fix		1 all nve
+fix		2 all langevin 1.0 1.0 100.0 904297
+
+# count atom types
+# end monomers type 1
+# interior monomers type 2
+# cross-linkers type 3
+group gtype1 type 1
+group gtype2 type 2
+group gtype3 type 3
+variable type1 equal count(gtype1)
+variable type2 equal count(gtype2)
+variable type3 equal count(gtype3)
+
+thermo          1000
+
+# small step to form bonds
+timestep	0.002
+
+# define rxn template
+molecule mymol template.kg
+
+# fix bond/create/rxn timesteps itype jtype dist bondtype
+# react chain ends type 1 with a crosslinker type 3
+fix 5 all bond/create/rxn 10 1 3 1.12 2 prob 1.0 1234 mol mymol
+
+thermo_style custom step temp pe v_type1 v_type2 v_type3 bonds angles dihedrals 
+
+run		100000
