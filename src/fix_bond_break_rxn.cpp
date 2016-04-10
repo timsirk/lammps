@@ -91,6 +91,8 @@ FixBondBreakRxn::FixBondBreakRxn(LAMMPS *lmp, int narg, char **arg) :
   }
   // error check
 
+  if (!topoflag)
+    error->all(FLERR,"No rxn template was found");
   if (atom->molecular != 1)
     error->all(FLERR,"Cannot use fix bond/break with non-molecular systems");
 
@@ -103,11 +105,7 @@ FixBondBreakRxn::FixBondBreakRxn(LAMMPS *lmp, int narg, char **arg) :
   // forward is big due to comm of broken bonds and 1-2 neighbors
   // topo class does the special comm if used
 
-  if(topoflag) 
-    comm_forward = 2;
-  else
-    comm_forward = MAX(2,2+atom->maxspecial);
-
+  comm_forward = 2;
   comm_reverse = 2;
 
   // allocate arrays local to this fix
@@ -167,30 +165,6 @@ void FixBondBreakRxn::init()
   if (strstr(update->integrate_style,"respa"))
     nlevels_respa = ((Respa *) update->integrate)->nlevels;
 
-  // enable angle/dihedral/improper breaking if any defined
-
-  if (atom->nangles) angleflag = 1;
-  else angleflag = 0;
-  if (atom->ndihedrals) dihedralflag = 1;
-  else dihedralflag = 0;
-  if (atom->nimpropers) improperflag = 1;
-  else improperflag = 0;
-
-  if (topoflag){
-    if (onemol->nangles > 0)
-      angleflag = 1;
-    else
-      angleflag = 0;
-    if (onemol->ndihedrals > 0)
-      dihedralflag = 1;
-    else
-      dihedralflag = 0;
-    if (onemol->nimpropers > 0)
-      improperflag = 1;
-    else
-      improperflag = 0;
-  }
-
   if (force->improper) {
     if (force->improper_match("class2") || force->improper_match("ring"))
       error->all(FLERR,"Cannot yet use fix bond/break with this "
@@ -198,9 +172,6 @@ void FixBondBreakRxn::init()
   }
 
   lastcheck = -1;
-
-  // DEBUG
-  //print_bb();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -322,37 +293,6 @@ void FixBondBreakRxn::post_integrate()
       }
     }
 
-   // topo class handles insert/delete of bonds and special lists
-   if(!topoflag){
-
-    // delete bond from atom I if I stores it
-    // atom J will also do this
-
-    for (m = 0; m < num_bond[i]; m++) {
-      if (bond_atom[i][m] == partner[i]) {
-        for (k = m; k < num_bond[i]-1; k++) {
-          bond_atom[i][k] = bond_atom[i][k+1];
-          bond_type[i][k] = bond_type[i][k+1];
-        }
-        num_bond[i]--;
-        break;
-      }
-    }
-
-    // remove J from special bond list for atom I
-    // atom J will also do this, whatever proc it is on
-
-    slist = special[i];
-    n1 = nspecial[i][0];
-    for (m = 0; m < n1; m++)
-      if (slist[m] == partner[i]) break;
-    n3 = nspecial[i][2];
-    for (; m < n3-1; m++) slist[m] = slist[m+1];
-    nspecial[i][0]--;
-    nspecial[i][1]--;
-    nspecial[i][2]--;
-  } //end topo
-
     // store final broken bond partners and count the broken bond once
     finalpartner[i] = tag[j];
     finalpartner[j] = tag[i];
@@ -363,8 +303,6 @@ void FixBondBreakRxn::post_integrate()
 
   MPI_Allreduce(&nbreak,&breakcount,1,MPI_INT,MPI_SUM,world);
   breakcounttotal += breakcount;
-  if(!topoflag)
-    atom->nbonds -= breakcount;
 
   // trigger reneighboring if any bonds were broken
   // this insures neigh lists will immediately reflect the topology changes
@@ -381,40 +319,8 @@ void FixBondBreakRxn::post_integrate()
   comm->forward_comm_fix(this);
 
   // topo handles the rest
-  if(topoflag){
     topo->change_bonds(0, finalpartner, onemol);
     return;
-  }
-
-  // create list of broken bonds that influence my owned atoms
-  //   even if between owned-ghost or ghost-ghost atoms
-  // finalpartner is now set for owned and ghost atoms so loop over nall
-  // OK if duplicates in broken list due to ghosts duplicating owned atoms
-  // check J < 0 to insure a broken bond to unknown atom is included
-  //   i.e. bond partner outside of cutoff length
-
-  nbreak = 0;
-  for (i = 0; i < nall; i++) {
-    if (finalpartner[i] == 0) continue;
-    j = atom->map(finalpartner[i]);
-    if (j < 0 || tag[i] < tag[j]) {
-      if (nbreak == maxbreak) {
-        maxbreak += DELTA;
-        memory->grow(broken,maxbreak,2,"bond/break:broken");
-      }
-      broken[nbreak][0] = tag[i];
-      broken[nbreak][1] = finalpartner[i];
-      nbreak++;
-    }
-  }
-
-  // update special neigh lists of all atoms affected by any broken bond
-  // also remove angles/dihedrals/impropers broken by broken bonds
-
-  update_topology();
-
-  // DEBUG
-  // print_bb();
 }
 
 /* ----------------------------------------------------------------------
@@ -449,292 +355,6 @@ void FixBondBreakRxn::check_ghosts()
   lastcheck = update->ntimestep;
 }
 
-/* ----------------------------------------------------------------------
-   double loop over my atoms and broken bonds
-   influenced = 1 if atom's topology is affected by any broken bond
-     yes if is one of 2 atoms in bond
-     yes if both atom IDs appear in atom's special list
-     else no
-   if influenced:
-     check for angles/dihedrals/impropers to break due to specific broken bonds
-     rebuild the atom's special list of 1-2,1-3,1-4 neighs
-------------------------------------------------------------------------- */
-
-void FixBondBreakRxn::update_topology()
-{
-  int i,j,k,n,influence,influenced,found;
-  tagint id1,id2;
-  tagint *slist;
-
-  tagint *tag = atom->tag;
-  int **nspecial = atom->nspecial;
-  tagint **special = atom->special;
-  int nlocal = atom->nlocal;
-
-  nangles = 0;
-  ndihedrals = 0;
-  nimpropers = 0;
-
-  //printf("NBREAK %d: ",nbreak);
-  //for (i = 0; i < nbreak; i++)
-  //  printf(" %d %d,",broken[i][0],broken[i][1]);
-  //printf("\n");
-
-  for (i = 0; i < nlocal; i++) {
-    influenced = 0;
-    slist = special[i];
-
-    for (j = 0; j < nbreak; j++) {
-      id1 = broken[j][0];
-      id2 = broken[j][1];
-
-      influence = 0;
-      if (tag[i] == id1 || tag[i] == id2) influence = 1;
-      else {
-        n = nspecial[i][2];
-        found = 0;
-        for (k = 0; k < n; k++)
-          if (slist[k] == id1 || slist[k] == id2) found++;
-        if (found == 2) influence = 1;
-      }
-      if (!influence) continue;
-      influenced = 1;
-
-      if (angleflag) break_angles(i,id1,id2);
-      if (dihedralflag) break_dihedrals(i,id1,id2);
-      if (improperflag) break_impropers(i,id1,id2);
-    }
-
-    if (influenced) rebuild_special(i);
-  }
-  
-  int newton_bond = force->newton_bond;
-
-  int all;
-  if (angleflag) {
-    MPI_Allreduce(&nangles,&all,1,MPI_INT,MPI_SUM,world);
-    if (!newton_bond) all /= 3;
-    atom->nangles -= all;
-  }
-  if (dihedralflag) {
-    MPI_Allreduce(&ndihedrals,&all,1,MPI_INT,MPI_SUM,world);
-    if (!newton_bond) all /= 4;
-    atom->ndihedrals -= all;
-  }
-  if (improperflag) {
-    MPI_Allreduce(&nimpropers,&all,1,MPI_INT,MPI_SUM,world);
-    if (!newton_bond) all /= 4;
-    atom->nimpropers -= all;
-  }
-}
-
-/* ----------------------------------------------------------------------
-   re-build special list of atom M
-   does not affect 1-2 neighs (already include effects of new bond)
-   affects 1-3 and 1-4 neighs due to other atom's augmented 1-2 neighs
-------------------------------------------------------------------------- */
-
-void FixBondBreakRxn::rebuild_special(int m)
-{
-  int i,j,n,n1,cn1,cn2,cn3;
-  tagint *slist;
-
-  tagint *tag = atom->tag;
-  int **nspecial = atom->nspecial;
-  tagint **special = atom->special;
-
-  // existing 1-2 neighs of atom M
-
-  slist = special[m];
-  n1 = nspecial[m][0];
-  cn1 = 0;
-  for (i = 0; i < n1; i++)
-    copy[cn1++] = slist[i];
-
-  // new 1-3 neighs of atom M, based on 1-2 neighs of 1-2 neighs
-  // exclude self
-  // remove duplicates after adding all possible 1-3 neighs
-
-  cn2 = cn1;
-  for (i = 0; i < cn1; i++) {
-    n = atom->map(copy[i]);
-    slist = special[n];
-    n1 = nspecial[n][0];
-    for (j = 0; j < n1; j++)
-      if (slist[j] != tag[m]) copy[cn2++] = slist[j];
-  }
-
-  cn2 = dedup(cn1,cn2,copy);
-
-  // new 1-4 neighs of atom M, based on 1-2 neighs of 1-3 neighs
-  // exclude self
-  // remove duplicates after adding all possible 1-4 neighs
-
-  cn3 = cn2;
-  for (i = cn1; i < cn2; i++) {
-    n = atom->map(copy[i]);
-    slist = special[n];
-    n1 = nspecial[n][0];
-    for (j = 0; j < n1; j++)
-      if (slist[j] != tag[m]) copy[cn3++] = slist[j];
-  }
-
-  cn3 = dedup(cn2,cn3,copy);
-
-  // store new special list with atom M
-
-  nspecial[m][0] = cn1;
-  nspecial[m][1] = cn2;
-  nspecial[m][2] = cn3;
-  memcpy(special[m],copy,cn3*sizeof(int));
-}
-
-/* ----------------------------------------------------------------------
-   break any angles owned by atom M that include atom IDs 1 and 2
-   angle is broken if ID1-ID2 is one of 2 bonds in angle (I-J,J-K)
-------------------------------------------------------------------------- */
-
-void FixBondBreakRxn::break_angles(int m, tagint id1, tagint id2)
-{
-  int j,found;
-
-  int num_angle = atom->num_angle[m];
-  int *angle_type = atom->angle_type[m];
-  tagint *angle_atom1 = atom->angle_atom1[m];
-  tagint *angle_atom2 = atom->angle_atom2[m];
-  tagint *angle_atom3 = atom->angle_atom3[m];
-
-  int i = 0;
-  while (i < num_angle) {
-    found = 0;
-    if (angle_atom1[i] == id1 && angle_atom2[i] == id2) found = 1;
-    else if (angle_atom2[i] == id1 && angle_atom3[i] == id2) found = 1;
-    else if (angle_atom1[i] == id2 && angle_atom2[i] == id1) found = 1;
-    else if (angle_atom2[i] == id2 && angle_atom3[i] == id1) found = 1;
-    if (!found) i++;
-    else {
-      for (j = i; j < num_angle-1; j++) {
-        angle_type[j] = angle_type[j+1];
-        angle_atom1[j] = angle_atom1[j+1];
-        angle_atom2[j] = angle_atom2[j+1];
-        angle_atom3[j] = angle_atom3[j+1];
-      }
-      num_angle--;
-      nangles++;
-    }
-  }
-
-  atom->num_angle[m] = num_angle;
-}
-
-/* ----------------------------------------------------------------------
-   break any dihedrals owned by atom M that include atom IDs 1 and 2
-   dihedral is broken if ID1-ID2 is one of 3 bonds in dihedral (I-J,J-K.K-L)
-------------------------------------------------------------------------- */
-
-void FixBondBreakRxn::break_dihedrals(int m, tagint id1, tagint id2)
-{
-  int j,found;
-
-  int num_dihedral = atom->num_dihedral[m];
-  int *dihedral_type = atom->dihedral_type[m];
-  tagint *dihedral_atom1 = atom->dihedral_atom1[m];
-  tagint *dihedral_atom2 = atom->dihedral_atom2[m];
-  tagint *dihedral_atom3 = atom->dihedral_atom3[m];
-  tagint *dihedral_atom4 = atom->dihedral_atom4[m];
-
-  int i = 0;
-  while (i < num_dihedral) {
-    found = 0;
-    if (dihedral_atom1[i] == id1 && dihedral_atom2[i] == id2) found = 1;
-    else if (dihedral_atom2[i] == id1 && dihedral_atom3[i] == id2) found = 1;
-    else if (dihedral_atom3[i] == id1 && dihedral_atom4[i] == id2) found = 1;
-    else if (dihedral_atom1[i] == id2 && dihedral_atom2[i] == id1) found = 1;
-    else if (dihedral_atom2[i] == id2 && dihedral_atom3[i] == id1) found = 1;
-    else if (dihedral_atom3[i] == id2 && dihedral_atom4[i] == id1) found = 1;
-    if (!found) i++;
-    else {
-      for (j = i; j < num_dihedral-1; j++) {
-        dihedral_type[j] = dihedral_type[j+1];
-        dihedral_atom1[j] = dihedral_atom1[j+1];
-        dihedral_atom2[j] = dihedral_atom2[j+1];
-        dihedral_atom3[j] = dihedral_atom3[j+1];
-        dihedral_atom4[j] = dihedral_atom4[j+1];
-      }
-      num_dihedral--;
-      ndihedrals++;
-    }
-  }
-
-  atom->num_dihedral[m] = num_dihedral;
-}
-
-/* ----------------------------------------------------------------------
-   break any impropers owned by atom M that include atom IDs 1 and 2
-   improper is broken if ID1-ID2 is one of 3 bonds in improper (I-J,I-K,I-L)
-------------------------------------------------------------------------- */
-
-void FixBondBreakRxn::break_impropers(int m, tagint id1, tagint id2)
-{
-  int j,found;
-
-  int num_improper = atom->num_improper[m];
-  int *improper_type = atom->improper_type[m];
-  tagint *improper_atom1 = atom->improper_atom1[m];
-  tagint *improper_atom2 = atom->improper_atom2[m];
-  tagint *improper_atom3 = atom->improper_atom3[m];
-  tagint *improper_atom4 = atom->improper_atom4[m];
-
-  int i = 0;
-  while (i < num_improper) {
-    found = 0;
-    if (improper_atom1[i] == id1 && improper_atom2[i] == id2) found = 1;
-    else if (improper_atom1[i] == id1 && improper_atom3[i] == id2) found = 1;
-    else if (improper_atom1[i] == id1 && improper_atom4[i] == id2) found = 1;
-    else if (improper_atom1[i] == id2 && improper_atom2[i] == id1) found = 1;
-    else if (improper_atom1[i] == id2 && improper_atom3[i] == id1) found = 1;
-    else if (improper_atom1[i] == id2 && improper_atom4[i] == id1) found = 1;
-    if (!found) i++;
-    else {
-      for (j = i; j < num_improper-1; j++) {
-        improper_type[j] = improper_type[j+1];
-        improper_atom1[j] = improper_atom1[j+1];
-        improper_atom2[j] = improper_atom2[j+1];
-        improper_atom3[j] = improper_atom3[j+1];
-        improper_atom4[j] = improper_atom4[j+1];
-      }
-      num_improper--;
-      nimpropers++;
-    }
-  }
-
-  atom->num_improper[m] = num_improper;
-}
-
-/* ----------------------------------------------------------------------
-   remove all ID duplicates in copy from Nstart:Nstop-1
-   compare to all previous values in copy
-   return N decremented by any discarded duplicates
-------------------------------------------------------------------------- */
-
-int FixBondBreakRxn::dedup(int nstart, int nstop, tagint *copy)
-{
-  int i;
-
-  int m = nstart;
-  while (m < nstop) {
-    for (i = 0; i < m; i++)
-      if (copy[i] == copy[m]) {
-        copy[m] = copy[nstop-1];
-        nstop--;
-        break;
-      }
-    if (i == m) m++;
-  }
-
-  return nstop;
-}
-
 /* ---------------------------------------------------------------------- */
 
 void FixBondBreakRxn::post_integrate_respa(int ilevel, int iloop)
@@ -759,7 +379,7 @@ int FixBondBreakRxn::pack_forward_comm(int n, int *list, double *buf,
     return m;
   }
 
- // topo handles special comm if present
+ // topo handles special comm 
   int **nspecial = atom->nspecial;
   tagint **special = atom->special;
 
@@ -767,12 +387,10 @@ int FixBondBreakRxn::pack_forward_comm(int n, int *list, double *buf,
   for (i = 0; i < n; i++) {
     j = list[i];
     buf[m++] = ubuf(finalpartner[j]).d;
-   if(!topoflag){
     ns = nspecial[j][0];
     buf[m++] = ubuf(ns).d;
     for (k = 0; k < ns; k++)
       buf[m++] = ubuf(special[j][k]).d;
-   }
   }
 
   return m;
@@ -801,12 +419,10 @@ void FixBondBreakRxn::unpack_forward_comm(int n, int first, double *buf)
     last = first + n;
     for (i = first; i < last; i++) {
       finalpartner[i] = (tagint) ubuf(buf[m++]).i;
-      if(!topoflag){
-        ns = (int) ubuf(buf[m++]).i;
-        nspecial[i][0] = ns;
-        for (j = 0; j < ns; j++)
-          special[i][j] = (tagint) ubuf(buf[m++]).i;
-      }
+      ns = (int) ubuf(buf[m++]).i;
+      nspecial[i][0] = ns;
+      for (j = 0; j < ns; j++)
+        special[i][j] = (tagint) ubuf(buf[m++]).i;
     }
   }
 }

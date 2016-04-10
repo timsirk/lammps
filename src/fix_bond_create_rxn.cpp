@@ -80,7 +80,6 @@ FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
   jnewtype = jatomtype;
   fraction = 1.0;
   int seed = 12345;
-  atype = dtype = itype = 0;
 
   int iarg = 8;
   while (iarg < narg) {
@@ -108,42 +107,28 @@ FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
         error->all(FLERR,"Illegal fix bond/create command");
       if (seed <= 0) error->all(FLERR,"Illegal fix bond/create command");
       iarg += 3;
-    } else if (strcmp(arg[iarg],"atype") == 0) {
-      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
-      atype = force->inumeric(FLERR,arg[iarg+1]);
-      if (atype < 0) error->all(FLERR,"Illegal fix bond/create command");
-      iarg += 2;
-    } else if (strcmp(arg[iarg],"dtype") == 0) {
-      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
-      dtype = force->inumeric(FLERR,arg[iarg+1]);
-      if (dtype < 0) error->all(FLERR,"Illegal fix bond/create command");
-      iarg += 2;
-    } else if (strcmp(arg[iarg],"itype") == 0) {
-      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
-      itype = force->inumeric(FLERR,arg[iarg+1]);
-      if (itype < 0) error->all(FLERR,"Illegal fix bond/create command");
-      iarg += 2;
-    } else if (strcmp(arg[iarg],"mol") == 0) {
+    } 
+      else if (strcmp(arg[iarg],"mol") == 0) {
       int imol = atom->find_molecule(arg[iarg+1]);
       if (imol == -1) error->all(FLERR,"Molecule template ID for "
                                  "create_atoms does not exist");
       topoflag = 1;
       onemol = atom->molecules[imol];
       iarg += 2;
-    } else error->all(FLERR,"Illegal fix bond/create command");
+    } 
+      else error->all(FLERR,"Illegal fix bond/create command");
   }
 
   // error check
 
+  if (!topoflag)
+    error->all(FLERR,"No rxn template was found");
   if (atom->molecular != 1)
     error->all(FLERR,"Cannot use fix bond/create with non-molecular systems");
   if (iatomtype == jatomtype &&
       ((imaxbond != jmaxbond) || (inewtype != jnewtype)))
     error->all(FLERR,
                "Inconsistent iparam/jparam values in fix bond/create command");
-  if (topoflag && (atype || dtype || itype || imaxbond || jmaxbond))
-    error->all(FLERR,
-               "Incompatible options in fix bond/create command");
 
   // initialize Marsaglia RNG with processor-unique seed
 
@@ -232,43 +217,6 @@ void FixBondCreateRxn::init()
 
   if (force->pair == NULL || cutsq > force->pair->cutsq[iatomtype][jatomtype])
     error->all(FLERR,"Fix bond/create cutoff is longer than pairwise cutoff");
-
-  // enable angle/dihedral/improper creation if atype/dtype/itype
-  //   option was used and a force field has been specified
-
-  if (atype && force->angle) {
-    angleflag = 1;
-    if (atype > atom->nangletypes) 
-      error->all(FLERR,"Fix bond/create angle type is invalid");
-  } else angleflag = 0;
-
-  if (dtype && force->dihedral) {
-    dihedralflag = 1;
-    if (dtype > atom->ndihedraltypes) 
-      error->all(FLERR,"Fix bond/create dihedral type is invalid");
-  } else dihedralflag = 0;
-
-  if (itype && force->improper) {
-    improperflag = 1;
-    if (itype > atom->nimpropertypes) 
-      error->all(FLERR,"Fix bond/create improper type is invalid");
-  } else improperflag = 0;
-
-  if (topoflag){
-    if (onemol->nangles > 0)
-      angleflag = 1;
-    else
-      angleflag = 0;
-    if (onemol->ndihedrals > 0)
-      dihedralflag = 1;
-    else
-      dihedralflag = 0;
-    if (onemol->nimpropers > 0)
-      improperflag = 1;
-    else
-      improperflag = 0;
-  }
-
   if (force->improper) {
     if (force->improper_match("class2") || force->improper_match("ring"))
       error->all(FLERR,"Cannot yet use fix bond/create with this "
@@ -276,8 +224,8 @@ void FixBondCreateRxn::init()
   }
 
   // need a half neighbor list, built every Nevery steps
-
   int irequest = neighbor->request((void *) this);
+
   //int irequest = neighbor->request(this,instance_me);
   neighbor->requests[irequest]->pair = 0;
   neighbor->requests[irequest]->fix = 1;
@@ -468,14 +416,12 @@ void FixBondCreateRxn::post_integrate()
 
   // reverse comm of distsq and partner
   // not needed if newton_pair off since I,J pair was seen by both procs
-
   commflag = 2;
   if (force->newton_pair) comm->reverse_comm_fix(this);
 
   // each atom now knows its winning partner
   // for prob check, generate random value for each atom with a bond partner
   // forward comm of partner and random value, so ghosts have it
-
   if (fraction < 1.0) {
     for (i = 0; i < nlocal; i++)
       if (partner[i]) probability[i] = random->uniform();
@@ -488,7 +434,6 @@ void FixBondCreateRxn::post_integrate()
   // only if both atoms list each other as winning bond partner
   //   and probability constraint is satisfied
   // if other atom is owned by another proc, it should do same thing
-
   int **bond_type = atom->bond_type;
   int newton_bond = force->newton_bond;
 
@@ -499,7 +444,6 @@ void FixBondCreateRxn::post_integrate()
     if (partner[j] != tag[i]) continue;
 
     // apply probability constraint using RN for atom with smallest ID
-
     if (fraction < 1.0) {
       if (tag[i] < tag[j]) {
         if (probability[i] >= fraction) continue;
@@ -507,9 +451,9 @@ void FixBondCreateRxn::post_integrate()
         if (probability[j] >= fraction) continue;
       }
     }
+
     // increment bondcount, convert atom to new type if limit reached
     // atom J will also do this, whatever proc it is on
-
     bondcount[i]++;
     if (type[i] == iatomtype) {
       if (bondcount[i] == imaxbond) type[i] = inewtype;
@@ -518,14 +462,12 @@ void FixBondCreateRxn::post_integrate()
     }
 
     // store final created bond partners and count the created bond once
-
     finalpartner[i] = tag[j];
     finalpartner[j] = tag[i];
     if (tag[i] < tag[j]) ncreate++;
   }
 
   // tally stats
-
   MPI_Allreduce(&ncreate,&createcount,1,MPI_INT,MPI_SUM,world);
   createcounttotal += createcount;
 
@@ -534,13 +476,11 @@ void FixBondCreateRxn::post_integrate()
   // trigger reneighboring if any bonds were formed
   // this insures neigh lists will immediately reflect the topology changes
   // done if any bonds created
-
   if (createcount) next_reneighbor = update->ntimestep;
   if (!createcount) return;
 
   // communicate final partner and 1-2 special neighbors
   // 1-2 neighs already reflect created bonds
-
   commflag = 3;
   comm->forward_comm_fix(this);
 
