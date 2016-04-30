@@ -52,7 +52,6 @@ class FixBondCreateRxn : public Fix {
   int iatomtype,jatomtype;
   int btype,seed;
   int imaxbond,jmaxbond;
-  int inewtype,jnewtype;
   double cutsq,fraction;
   int atype,dtype,itype;
   int angleflag,dihedralflag,improperflag;
@@ -71,22 +70,13 @@ class FixBondCreateRxn : public Fix {
   int ncreate,maxcreate;
   tagint **created;
 
-  tagint *copy;
-
   class RanMars *random;
   class NeighList *list;
   
   int countflag,commflag;
   int nlevels_respa;
-  int nangles,ndihedrals,nimpropers;
 
   void check_ghosts();
-  void update_topology();
-  void rebuild_special(int);
-  void create_angles(int);
-  void create_dihedrals(int);
-  void create_impropers(int);
-  int dedup(int, int, tagint *);
 
   // DEBUG
 

@@ -1406,16 +1406,12 @@ void Topo::comm_special()
 
   // unpack special
   for (i = nlocal; i < nall; i++){
-//    nspecial[i][0] = (int) ubuf(test[i][0]).i;
-//    nspecial[i][1] = (int) ubuf(test[i][0]).i;
-//    nspecial[i][2] = (int) ubuf(test[i][0]).i;
     nspecial[i][0] = (int)test[i][0];
     nspecial[i][1] = (int)test[i][0];
     nspecial[i][2] = (int)test[i][0];
 
     ns = nspecial[i][0];
     for (j = 1; j <= ns; j++){
-      //special[i][j-1] = (int) ubuf(test[i][j]).i;
       special[i][j-1] = (int)test[i][j];
     }
   }

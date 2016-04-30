@@ -43,7 +43,7 @@ using namespace FixConst;
 FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
-  if (narg < 8) error->all(FLERR,"Illegal fix bond/create command");
+  if (narg < 7) error->all(FLERR,"Illegal fix bond/create command");
 
   MPI_Comm_rank(world,&me);
 
@@ -61,44 +61,39 @@ FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
   iatomtype = force->inumeric(FLERR,arg[4]);
   jatomtype = force->inumeric(FLERR,arg[5]);
   double cutoff = force->numeric(FLERR,arg[6]);
-  btype = force->inumeric(FLERR,arg[7]);
 
   if (iatomtype < 1 || iatomtype > atom->ntypes ||
       jatomtype < 1 || jatomtype > atom->ntypes)
     error->all(FLERR,"Invalid atom type in fix bond/create command");
   if (cutoff < 0.0) error->all(FLERR,"Illegal fix bond/create command");
-  if (btype < 1 || btype > atom->nbondtypes)
-    error->all(FLERR,"Invalid bond type in fix bond/create command");
 
   cutsq = cutoff*cutoff;
 
   // optional keywords
 
   imaxbond = 0;
-  inewtype = iatomtype;
   jmaxbond = 0;
-  jnewtype = jatomtype;
+  btype = 0;
   fraction = 1.0;
   int seed = 12345;
 
-  int iarg = 8;
+  int iarg = 7;
   while (iarg < narg) {
-    if (strcmp(arg[iarg],"iparam") == 0) {
-      if (iarg+3 > narg) error->all(FLERR,"Illegal fix bond/create command");
+    if (strcmp(arg[iarg],"imax") == 0) {
+      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
       imaxbond = force->inumeric(FLERR,arg[iarg+1]);
-      inewtype = force->inumeric(FLERR,arg[iarg+2]);
       if (imaxbond < 0) error->all(FLERR,"Illegal fix bond/create command");
-      if (inewtype < 1 || inewtype > atom->ntypes)
-        error->all(FLERR,"Invalid atom type in fix bond/create command");
-      iarg += 3;
-    } else if (strcmp(arg[iarg],"jparam") == 0) {
-      if (iarg+3 > narg) error->all(FLERR,"Illegal fix bond/create command");
+      iarg += 2;
+    } else if (strcmp(arg[iarg],"jmax") == 0) {
+      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
       jmaxbond = force->inumeric(FLERR,arg[iarg+1]);
-      jnewtype = force->inumeric(FLERR,arg[iarg+2]);
       if (jmaxbond < 0) error->all(FLERR,"Illegal fix bond/create command");
-      if (jnewtype < 1 || jnewtype > atom->ntypes)
-        error->all(FLERR,"Invalid atom type in fix bond/create command");
-      iarg += 3;
+      iarg += 2;
+    } else if (strcmp(arg[iarg],"btype") == 0) {
+      if (iarg+2 > narg) error->all(FLERR,"Illegal fix bond/create command");
+      btype = force->inumeric(FLERR,arg[iarg+1]);
+      if (btype < 0 || btype > atom->nbondtypes) error->all(FLERR,"Illegal fix bond/create command");
+      iarg += 2;
     } else if (strcmp(arg[iarg],"prob") == 0) {
       if (iarg+3 > narg) error->all(FLERR,"Illegal fix bond/create command");
       fraction = force->numeric(FLERR,arg[iarg+1]);
@@ -125,10 +120,6 @@ FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
     error->all(FLERR,"No rxn template was found");
   if (atom->molecular != 1)
     error->all(FLERR,"Cannot use fix bond/create with non-molecular systems");
-  if (iatomtype == jatomtype &&
-      ((imaxbond != jmaxbond) || (inewtype != jnewtype)))
-    error->all(FLERR,
-               "Inconsistent iparam/jparam values in fix bond/create command");
 
   // initialize Marsaglia RNG with processor-unique seed
 
@@ -160,17 +151,7 @@ FixBondCreateRxn::FixBondCreateRxn(LAMMPS *lmp, int narg, char **arg) :
   maxcreate = 0;
   created = NULL;
 
-  // copy = special list for one atom
-  // size = ms^2 + ms is sufficient
-  // b/c in rebuild_special() neighs of all 1-2s are added,
-  //   then a dedup(), then neighs of all 1-3s are added, then final dedup()
-  // this means intermediate size cannot exceed ms^2 + ms
-
-  int maxspecial = atom->maxspecial;
-  copy = new tagint[maxspecial*maxspecial + maxspecial];
-
   // zero out stats
-
   createcount = 0;
   createcounttotal = 0;
 }
@@ -193,7 +174,6 @@ FixBondCreateRxn::~FixBondCreateRxn()
   memory->destroy(finalpartner);
   memory->destroy(distsq);
   memory->destroy(created);
-  delete [] copy;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -270,7 +250,7 @@ void FixBondCreateRxn::setup(int vflag)
 
   for (i = 0; i < nlocal; i++)
     for (j = 0; j < num_bond[i]; j++) {
-      if (bond_type[i][j] == btype) {
+      if (bond_type[i][j] == btype || btype == 0) {
         bondcount[i]++;
         if (newton_bond) {
           m = atom->map(bond_atom[i][j]);
@@ -455,11 +435,6 @@ void FixBondCreateRxn::post_integrate()
     // increment bondcount, convert atom to new type if limit reached
     // atom J will also do this, whatever proc it is on
     bondcount[i]++;
-    if (type[i] == iatomtype) {
-      if (bondcount[i] == imaxbond) type[i] = inewtype;
-    } else {
-      if (bondcount[i] == jmaxbond) type[i] = jnewtype;
-    }
 
     // store final created bond partners and count the created bond once
     finalpartner[i] = tag[j];

@@ -77,13 +77,13 @@ FixBondBreakRxn::FixBondBreakRxn(LAMMPS *lmp, int narg, char **arg) :
       fraction = force->numeric(FLERR,arg[iarg+1]);
       seed = force->inumeric(FLERR,arg[iarg+2]);
       if (fraction < 0.0 || fraction > 1.0)
-        error->all(FLERR,"Illegal fix bond/break command");
+        error->all(FLERR,"Illegal fix bond/break/rxn command");
       if (seed <= 0) error->all(FLERR,"Illegal fix bond/break command");
       iarg += 3;
     } else if (strcmp(arg[iarg],"mol") == 0) {
       int imol = atom->find_molecule(arg[iarg+1]);
       if (imol == -1) error->all(FLERR,"Molecule template ID for "
-                                 "bond/break does not exist");
+                                 "bond/break/rxn does not exist");
       topoflag = 1;
       onemol = atom->molecules[imol];
       iarg += 2;
@@ -102,8 +102,7 @@ FixBondBreakRxn::FixBondBreakRxn(LAMMPS *lmp, int narg, char **arg) :
   topo = new Topo(lmp);
 
   // set comm sizes needed by this fix
-  // forward is big due to comm of broken bonds and 1-2 neighbors
-  // topo class does the special comm if used
+  // topo class does the special comm 
 
   comm_forward = 2;
   comm_reverse = 2;
@@ -117,17 +116,7 @@ FixBondBreakRxn::FixBondBreakRxn(LAMMPS *lmp, int narg, char **arg) :
   maxbreak = 0;
   broken = NULL;
 
-  // copy = special list for one atom
-  // size = ms^2 + ms is sufficient
-  // b/c in rebuild_special() neighs of all 1-2s are added,
-  //   then a dedup(), then neighs of all 1-3s are added, then final dedup()
-  // this means intermediate size cannot exceed ms^2 + ms
-
-  int maxspecial = atom->maxspecial;
-  copy = new tagint[maxspecial*maxspecial + maxspecial];
-
   // zero out stats
-
   breakcount = 0;
   breakcounttotal = 0;
 }
@@ -145,7 +134,6 @@ FixBondBreakRxn::~FixBondBreakRxn()
   memory->destroy(finalpartner);
   memory->destroy(distsq);
   memory->destroy(broken);
-  delete [] copy;
 }
 
 /* ---------------------------------------------------------------------- */

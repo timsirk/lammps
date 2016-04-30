@@ -45,7 +45,6 @@ class FixBondBreakRxn : public Fix {
   int me,nprocs;
   int btype,seed;
   double cutoff,cutsq,fraction;
-  int angleflag,dihedralflag,improperflag;
   bigint lastcheck;
 
   class Molecule *onemol;
@@ -59,22 +58,12 @@ class FixBondBreakRxn : public Fix {
   int nbreak,maxbreak;
   tagint **broken;
 
-  tagint *copy;
-
   class RanMars *random;
   int nlevels_respa;
 
   int commflag;
   int nbroken;
-  int nangles,ndihedrals,nimpropers;
-
   void check_ghosts();
-  void update_topology();
-  void break_angles(int, tagint, tagint);
-  void break_dihedrals(int, tagint, tagint);
-  void break_impropers(int, tagint, tagint);
-  void rebuild_special(int);
-  int dedup(int, int, tagint *);
   
   // DEBUG
 
