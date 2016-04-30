@@ -883,6 +883,7 @@ void Topo::create_dihedrals(int m)
 
 void Topo::create_impropers(int m)
 {
+
   int i,j,k,n,i1local,n1,n2;
   tagint i1,i2,i3,i4;
   tagint *s1list,*s2list;
@@ -913,6 +914,8 @@ void Topo::create_impropers(int m)
     for (j = i+1; j < n1; j++) {
       i3 = s1list[j];
       for (k = j+1; k < n1; k++) {
+
+printf("\nhere\n");
         i4 = s1list[k];
 
         // improper = i1-i2-i3-i4
@@ -1162,6 +1165,8 @@ int Topo::check_itype(int i1, int i2, int i3, int i4)
   int i3type = type[atom->map(i3)];
   int i4type = type[atom->map(i4)];
 
+printf("%d %d %d %d\n", i1type, i2type, i3type, i4type);
+
   // check for matching types in the improper section of molecule template 
   // template is zero indexed
 
@@ -1401,12 +1406,17 @@ void Topo::comm_special()
 
   // unpack special
   for (i = nlocal; i < nall; i++){
-    nspecial[i][0] = (int) ubuf(test[i][0]).i;
-    nspecial[i][1] = (int) ubuf(test[i][0]).i;
-    nspecial[i][2] = (int) ubuf(test[i][0]).i;
+//    nspecial[i][0] = (int) ubuf(test[i][0]).i;
+//    nspecial[i][1] = (int) ubuf(test[i][0]).i;
+//    nspecial[i][2] = (int) ubuf(test[i][0]).i;
+    nspecial[i][0] = (int)test[i][0];
+    nspecial[i][1] = (int)test[i][0];
+    nspecial[i][2] = (int)test[i][0];
+
     ns = nspecial[i][0];
     for (j = 1; j <= ns; j++){
-      special[i][j-1] = (int) ubuf(test[i][j]).i;
+      //special[i][j-1] = (int) ubuf(test[i][j]).i;
+      special[i][j-1] = (int)test[i][j];
     }
   }
 }
