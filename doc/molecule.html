@@ -459,13 +459,30 @@ of SHAKE clusters.
 </P>
 <HR>
 
-<P>The molecule command can also define a reaction template. A reaction template describes the way in which the local environment near a newly created or broken bond is updated by a fix or command. Currently only <A HREF = "fix_bond_create.html">fix_bond_create</A> and <A HREF = "fix_bond_break.html">fix_bond_break</A> support reaction templates. 
+<P>The molecule command can also define a reaction template. A reaction 
+template describes the way in which the local environment near a newly 
+created or broken bond is updated by a fix or command. Only 
+<A HREF = "fix_bond_create_rxn.html">fix bond/create/rxn</A> and <A HREF = "fix">fix bond/break/rxn</A> bond_break_rxn.html 
+support reaction templates. 
 </P>
-<P>When a new bond is created, the bond type and any changes to the environment near the bond are determined by scanning the atom types of a set of nearby atoms called <I>influenced atoms</I>. The influenced atoms include only the two atoms in the new bond (<I>i</I>, <I>j</I>) and the 1-2 and 1-3 bond neighbors of <I>i</I> and <I>j</I>. New 3-body interactions (angle) and 4-body (dihedral, improper) interactions are inferred from the influenced atoms. A new bond is added only if its sequence of atom types is found on reaction template in the <I>RBonds</I> section. Likewise, an inferred angle, dihedral or improper will be added only if it is matched in the <I>RAngles</I>, <I>RDihedrals</I> or <I>RImpropers</I> sections. Further, the atom types and charges of influenced atoms are updated to the new values given in the <I>RTypes</I> and <I>RCharges</I> sections of the reaction template. 
+<P>When a bond is created, the bond type and any changes to the environment 
+near the bond are determined by scanning the atom types of a set of 
+nearby atoms called <I>influenced atoms</I>. The influenced atoms include 
+only the two atoms in the new bond (<I>i</I>, <I>j</I>) and the 1-2 and 1-3 bond 
+neighbors of <I>i</I> and <I>j</I>. New 3-body interactions (angle) and 4-body 
+(dihedral, improper) interactions are inferred from the influenced atoms. 
+A new bond is added only if its sequence of atom types is found on reaction 
+template in the <I>RBonds</I> section. Likewise, an inferred angle, dihedral or 
+improper will be added only if it is matched in the <I>RAngles</I>, <I>RDihedrals</I> 
+or <I>RImpropers</I> sections. Further, the atom types and charges of 
+influenced atoms are updated to the new values given in the <I>RTypes</I> and 
+<I>RCharges</I> sections of the reaction template. The same applies when a bond 
+is broken, except that angle, dihedral and improper interactions involving 
+<I>i</I> and <I>j</I> are always removed. This is true for broken bonds, regardless 
+of the content of the <I>RAngles</I>, <I>RDihederals</I> and <I>RImpropers</I> sections.
 </P>
-<P>IMPORTANT NOTE: The data structures within LAMMPS that store bond topology are updated to reflect the creation of the new bonds, angles, etc. The internal LAMMPS data structures that store this information must have space for it. The "extra bond per atom" parameter must be set in the data file to allow space for any new bonds that are created. Ditto for "extra angle per atom", "extra dihedral per atom", and "extra improper per atom" if angles, dihedrals, or impropers are being added as new bonds are created. See the <A HREF = "fix_bond_create.html">fix_bond_create</A>, <A HREF = "read_data.html">read_data</A> or <A HREF = "create_box.html">create_box</A> command for more details. 
-</P>
-<P>Only one reaction template should be given per file. The meaning of the fields in the reaction template are given below. 
+<P>Only one reaction template should be given per file. The meaning of the 
+fields in the reaction template are given below. 
 </P>
 <P>These are the header keywords.  
 </P>
@@ -557,7 +574,7 @@ that match an entry in the <I>RAngles</I> section, a new angle is created for at
 <P><B>Related commands:</B>
 </P>
 <P><A HREF = "fix_deposit.html">fix deposit</A>, <A HREF = "fix_pour.html">fix pour</A>,
-<A HREF = "fix_gcmc.html">fix_gcmc</A>
+<A HREF = "fix_gcmc.html">fix_gcmc</A>, <A HREF = "fix_bond_create_rxn.html">fix bond/create/rxn</A>, <A HREF = "fix_bond_break_rxn.txt">fix bond/break/rxn</A>
 </P>
 <P><B>Default:</B>
 </P>

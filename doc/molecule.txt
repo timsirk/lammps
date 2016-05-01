@@ -451,13 +451,30 @@ of SHAKE clusters.
 
 :line
 
-The molecule command can also define a reaction template. A reaction template describes the way in which the local environment near a newly created or broken bond is updated by a fix or command. Currently only "fix_bond_create"_fix_bond_create.html and "fix_bond_break"_fix_bond_break.html support reaction templates. 
+The molecule command can also define a reaction template. A reaction 
+template describes the way in which the local environment near a newly 
+created or broken bond is updated by a fix or command. Only 
+"fix bond/create/rxn"_fix_bond_create_rxn.html and "fix bond/break/rxn"_fix bond_break_rxn.html 
+support reaction templates. 
 
-When a new bond is created, the bond type and any changes to the environment near the bond are determined by scanning the atom types of a set of nearby atoms called {influenced atoms}. The influenced atoms include only the two atoms in the new bond ({i}, {j}) and the 1-2 and 1-3 bond neighbors of {i} and {j}. New 3-body interactions (angle) and 4-body (dihedral, improper) interactions are inferred from the influenced atoms. A new bond is added only if its sequence of atom types is found on reaction template in the {RBonds} section. Likewise, an inferred angle, dihedral or improper will be added only if it is matched in the {RAngles}, {RDihedrals} or {RImpropers} sections. Further, the atom types and charges of influenced atoms are updated to the new values given in the {RTypes} and {RCharges} sections of the reaction template. 
+When a bond is created, the bond type and any changes to the environment 
+near the bond are determined by scanning the atom types of a set of 
+nearby atoms called {influenced atoms}. The influenced atoms include 
+only the two atoms in the new bond ({i}, {j}) and the 1-2 and 1-3 bond 
+neighbors of {i} and {j}. New 3-body interactions (angle) and 4-body 
+(dihedral, improper) interactions are inferred from the influenced atoms. 
+A new bond is added only if its sequence of atom types is found on reaction 
+template in the {RBonds} section. Likewise, an inferred angle, dihedral or 
+improper will be added only if it is matched in the {RAngles}, {RDihedrals} 
+or {RImpropers} sections. Further, the atom types and charges of 
+influenced atoms are updated to the new values given in the {RTypes} and 
+{RCharges} sections of the reaction template. The same applies when a bond 
+is broken, except that angle, dihedral and improper interactions involving 
+{i} and {j} are always removed. This is true for broken bonds, regardless 
+of the content of the {RAngles}, {RDihederals} and {RImpropers} sections.
 
-IMPORTANT NOTE: The data structures within LAMMPS that store bond topology are updated to reflect the creation of the new bonds, angles, etc. The internal LAMMPS data structures that store this information must have space for it. The "extra bond per atom" parameter must be set in the data file to allow space for any new bonds that are created. Ditto for "extra angle per atom", "extra dihedral per atom", and "extra improper per atom" if angles, dihedrals, or impropers are being added as new bonds are created. See the "fix_bond_create"_fix_bond_create.html, "read_data"_read_data.html or "create_box"_create_box.html command for more details. 
-
-Only one reaction template should be given per file. The meaning of the fields in the reaction template are given below. 
+Only one reaction template should be given per file. The meaning of the 
+fields in the reaction template are given below. 
 
 These are the header keywords.  
   
@@ -549,7 +566,7 @@ New improper interactions are inferred between atoms {ijkl}, where {j} is the ce
 [Related commands:]
 
 "fix deposit"_fix_deposit.html, "fix pour"_fix_pour.html,
-"fix_gcmc"_fix_gcmc.html
+"fix_gcmc"_fix_gcmc.html, "fix bond/create/rxn"_fix_bond_create_rxn.html, "fix bond/break/rxn"_fix_bond_break_rxn.txt
 
 [Default:]
 
