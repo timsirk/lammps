@@ -460,6 +460,8 @@ void FixBondCreateRxn::post_integrate()
   comm->forward_comm_fix(this);
 
   // topo handles the rest
+  // actually make the bonds
+  // update topology and influenced atoms
     topo->change_bonds(1, finalpartner, onemol);
     return;
 }

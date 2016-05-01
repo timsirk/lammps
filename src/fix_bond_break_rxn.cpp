@@ -296,7 +296,6 @@ void FixBondBreakRxn::post_integrate()
   // this insures neigh lists will immediately reflect the topology changes
   // done if no bonds broken
 
-
   if (breakcount) next_reneighbor = update->ntimestep;
   if (!breakcount) return;
 
@@ -307,6 +306,8 @@ void FixBondBreakRxn::post_integrate()
   comm->forward_comm_fix(this);
 
   // topo handles the rest
+  // actually break the bonds
+  // update topology and influenced atoms
     topo->change_bonds(0, finalpartner, onemol);
     return;
 }
