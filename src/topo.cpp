@@ -134,15 +134,15 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   // memory->create(dlist,nlocal,"topo:dlist");
 
   // settings
-    if (onemol->nrangles > 0)
+    if (onemol->nrangles > 0 || flag == 0)
       angleflag = 1;
     else 
       angleflag = 0;
-    if (onemol->nrdihedrals > 0)
+    if (onemol->nrdihedrals > 0 || flag == 0)
       dihedralflag = 1;
     else 
       dihedralflag = 0;
-    if (onemol->nrimpropers > 0)
+    if (onemol->nrimpropers > 0 || flag == 0)
       improperflag = 1;
     else 
       improperflag = 0;
@@ -420,7 +420,6 @@ done:
   // must be done after angle, dih, impro are matched
 
     for (int ii = 0; ii < ninfluenced; ii++) {
-
       i = influencedlist[ii];
       // charge update
       if (atom->q_flag)
@@ -1022,7 +1021,7 @@ int Topo::dedup(int nstart, int nstop, tagint *copy)
 
 int Topo::check_btype(int i1, int i2)
 {
-  // new code
+
   int* type = atom->type;
   int  nrbonds = onemol->nrbonds;
   int** bond_ratom = onemol->bond_ratom;

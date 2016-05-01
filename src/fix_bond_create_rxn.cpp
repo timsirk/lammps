@@ -432,7 +432,6 @@ void FixBondCreateRxn::post_integrate()
       }
     }
 
-    // increment bondcount, convert atom to new type if limit reached
     // atom J will also do this, whatever proc it is on
     bondcount[i]++;
 
@@ -445,8 +444,6 @@ void FixBondCreateRxn::post_integrate()
   // tally stats
   MPI_Allreduce(&ncreate,&createcount,1,MPI_INT,MPI_SUM,world);
   createcounttotal += createcount;
-
-  atom->nbonds += createcount;
 
   // trigger reneighboring if any bonds were formed
   // this insures neigh lists will immediately reflect the topology changes
