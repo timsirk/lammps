@@ -6,28 +6,29 @@
 
 :line
 
-fix bond/break command :h3
+fix bond/break/rxn command :h3
 
 [Syntax:]
 
 fix ID group-ID bond/break Nevery bondtype Rmax keyword values ... :pre
 
 ID, group-ID are documented in "fix"_fix.html command :ulb,l
-bond/break = style name of this fix command :l
+bond/break/rxn = style name of this fix command :l
 Nevery = attempt bond breaking every this many steps :l
 bondtype = type of bonds to break :l
 Rmax = bond longer than Rmax can break (distance units) :l
 zero or more keyword/value pairs may be appended to args :l
-keyword = {prob} :l
+keyword = {prob} or {mol} :l
   {prob} values = fraction seed
     fraction = break a bond with this probability if otherwise eligible
-    seed = random number seed (positive integer) :pre
+    seed = random number seed (positive integer) 
+  {mol} name = {reaction template} defined by the {molecule} command :pre
 :ule
 
 [Examples:]
 
 fix 5 all bond/break 10 2 1.2
-fix 5 polymer bond/break 1 1 2.0 prob 0.5 49829 :pre
+fix 5 polymer bond/break 1 1 2.0 prob 0.5 49829 mol rxnmol :pre
 
 [Description:]
 
@@ -37,7 +38,7 @@ polymer network due to stretching of the simulation box or other
 deformations.  In this context, a bond means an interaction between a
 pair of atoms computed by the "bond_style"_bond_style.html command.
 Once the bond is broken it will be permanently deleted, as will all
-angle, dihedral, and improper interactions that bond is part of.
+angle, dihedral, and improper interactions that bond is part of. See the discussion of the {mol} keyword below. 
 
 This is different than a "pairwise"_pair_style.html bond-order
 potential such as Tersoff or AIREBO which infers bonds and many-body
@@ -70,7 +71,19 @@ broken.  The {fraction} setting must be a value between 0.0 and 1.0.
 A uniform random number between 0.0 and 1.0 is generated and the
 eligible bond is only broken if the random number < fraction.
 
-The {mol} keyword reads a "molecule"_molecule.html to determine how the environment near a broken bond is updated. A {molecule} containing a reaction template must be defined and read with the {mol} option. The {molecule} command describes the format of the reaction template.
+The {mol} keyword can be used to control the atom types and charges 
+of atoms I and J, and other atoms near a broken bond.
+This means that atoms near a new bond can have different pairwise parameters
+before and after the new bond by specifying different
+"pair_coeff"_pair_coeff.html coefficients.  If you do not wish the
+atom types or charges of these {influenced atoms} to change, the same 
+before/after values should be given in the {RTypes} and {RCharges} 
+fields of the {reaction template}. When a bond is broken, the angle, 
+dihedral and improper interactions are removed, regardless of the content 
+of the {RAngles}, {RDihedrals} and {RImproper} fields of the reaction 
+template. The doc for "molecule"_molecule.html command descibes the 
+fields of the reaction template and influenced atoms. The {mol} keyword 
+is currently required. 
 
 When a bond is broken, data structures within LAMMPS that store bond
 topology are updated to reflect the breakage.  Likewise, if the bond
@@ -138,7 +151,7 @@ LAMMPS"_Section_start.html#start_3 section for more info.
 
 [Related commands:]
 
-"fix bond/create"_fix_bond_create.html, "fix
+"fix bond/create/rxn"_fix_bond_create_rxn.html, "fix
 bond/swap"_fix_bond_swap.html, "dump local"_dump.html,
 "special_bonds"_special_bonds.html
 

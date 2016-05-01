@@ -48,19 +48,19 @@ Topo *Topo::cptr;
 /* ---------------------------------------------------------------------- */
 Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
 
-  // this arr/y not atom-based, grow later as needed
+  // this array not atom-based, grow later as needed
   influencedlist = NULL;
   maxinfluenced = DELTA;
   maxcreate = 0;
   memory->grow(influencedlist,maxinfluenced,"topo:influencedlist");
 
   // per-atom array to comm special list
-  test = NULL;
+  temp = NULL;
   maxnmax = atom->nmax;
-  memory->grow(test,maxnmax,2+atom->maxspecial,"topo:test");
+  memory->grow(temp,maxnmax,2+atom->maxspecial,"topo:temp");
 
   // forward comm to update group info
-  //comm_forward = MAX(2,2+atom->maxspecial);
+  // comm_forward = MAX(2,2+atom->maxspecial);
 
   memory->create(created,DELTA,2,"topo:created");
   // copy = special list for one atom
@@ -123,7 +123,6 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   int newton_bond = force->newton_bond; 
   int nlocal = atom->nlocal;  
   int nall = nlocal + atom->nghost;
-//  int createcount = 0;
 
   // mymol ptr can be passed in by various fixes, etc
   onemol = mymol;
@@ -131,14 +130,10 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   // working variables
   int i,j, tmp;
 
-// call back for per atom arrays (special bonds)
-//memory->grow(test,atom->nmax,"topo:");
-//atom->add_callback(0);
+  // deletion list
+  // memory->create(dlist,nlocal,"topo:dlist");
 
-  // allocate and initialize deletion list
-  memory->create(dlist,nlocal,"topo:dlist");
-
- // settings
+  // settings
     if (onemol->nrangles > 0)
       angleflag = 1;
     else 
@@ -263,8 +258,6 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   // check J < 0 to insure a broken bond to unknown atom is included
   //   i.e. a bond partner outside of cutoff length
 
-  //memory->create(created,DELTA,2,"topo:created");
-
   ncreate = 0;
   for (i = 0; i < nall; i++) {
     if (finalpartner[i] == 0) continue;
@@ -292,7 +285,7 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
   update_topology();
 
   // delete if type -1
-  //delete_atom();
+  // delete_atom();
 
   comm->forward_comm();
 
@@ -320,7 +313,6 @@ void Topo::update_topology()
   tagint *tag = atom->tag;
   int **nspecial = atom->nspecial;
   tagint **special = atom->special;
-//  tagint *type = atom->type;
   int nlocal = atom->nlocal;
 
   nangles = 0;
@@ -360,7 +352,8 @@ void Topo::update_topology()
             influence = 1;
             goto done;
           }
-          // also need to check 1-2 1-2 neighs if special is 011, 111
+          // check 1-2 1-2 neighs if special is 011, 111
+          // eg might need for angles in a KG or DPD model 
           if(specialflag12){
 
             ii = atom->map(slist[k]);
@@ -436,7 +429,7 @@ done:
       atom->type[i] = onemol->rtype[atom->type[i]-1];
     }
 
-  // delete any atoms with type -1
+  // delete atoms with type -1
   //      delete_atom();
 
   int overflowall;
@@ -915,7 +908,6 @@ void Topo::create_impropers(int m)
       i3 = s1list[j];
       for (k = j+1; k < n1; k++) {
 
-printf("\nhere\n");
         i4 = s1list[k];
 
         // improper = i1-i2-i3-i4
@@ -1165,8 +1157,6 @@ int Topo::check_itype(int i1, int i2, int i3, int i4)
   int i3type = type[atom->map(i3)];
   int i4type = type[atom->map(i4)];
 
-printf("%d %d %d %d\n", i1type, i2type, i3type, i4type);
-
   // check for matching types in the improper section of molecule template 
   // template is zero indexed
 
@@ -1365,11 +1355,11 @@ void Topo::break_impropers(int m, tagint id1, tagint id2)
 void Topo::comm_special()
 {
 
-  // setup for comm of special lists
+  // comm of special lists in a command
   // need only 1-2 neighs for ghosts
-  // zero array for special comm 
-  // use double arrays for now
-  // pack ints into double later?
+  // this does forward comm of a temp array with special info
+  // then copy the ghosts into special
+  // maybe a better way 
  
   int i,j;
   int nlocal = atom->nlocal;
@@ -1379,13 +1369,13 @@ void Topo::comm_special()
   tagint *slist = special[i];
  
   if(atom->nmax > maxnmax){
-    memory->grow(test,atom->nmax,2+atom->maxspecial,"topo:test");
+    memory->grow(temp,atom->nmax,2+atom->maxspecial,"topo:temp");
     maxnmax = atom->nmax;
   }
 
   for (i = 0; i < nall; i++) 
     for (j = 0; j < 2+atom->maxspecial; j++) 
-      test[i][j] = 0.0;
+      temp[i][j] = 0.0;
 
 // pack array for special comm
 // only pack 1-2 neighs
@@ -1396,23 +1386,23 @@ void Topo::comm_special()
 
   for (i = 0; i < nlocal; i++){
     ns = nspecial[i][0];
-    test[i][0] = (double)ns;
+    temp[i][0] = (double)ns;
     slist = special[i];
     for (j = 1; j <= ns; j++)
-      test[i][j] = (double)slist[j-1];
+      temp[i][j] = (double)slist[j-1];
   }
 
-  comm->forward_comm_array(2+atom->maxspecial,test);
+  comm->forward_comm_array(2+atom->maxspecial,temp);
 
   // unpack special
   for (i = nlocal; i < nall; i++){
-    nspecial[i][0] = (int)test[i][0];
-    nspecial[i][1] = (int)test[i][0];
-    nspecial[i][2] = (int)test[i][0];
+    nspecial[i][0] = (int)temp[i][0];
+    nspecial[i][1] = (int)temp[i][0];
+    nspecial[i][2] = (int)temp[i][0];
 
     ns = nspecial[i][0];
     for (j = 1; j <= ns; j++){
-      special[i][j-1] = (int)test[i][j];
+      special[i][j-1] = (int)temp[i][j];
     }
   }
 }

@@ -9,7 +9,7 @@
 
 <HR>
 
-<H3>fix bond/break command 
+<H3>fix bond/break/rxn command 
 </H3>
 <P><B>Syntax:</B>
 </P>
@@ -27,18 +27,19 @@
 
 <LI>zero or more keyword/value pairs may be appended to args 
 
-<LI>keyword = <I>prob</I> 
+<LI>keyword = <I>prob</I> or <I>mol</I> 
 
 <PRE>  <I>prob</I> values = fraction seed
     fraction = break a bond with this probability if otherwise eligible
     seed = random number seed (positive integer) 
+  <I>mol</I> name = <I>reaction template</I> defined by the <I>molecule</I> command 
 </PRE>
 
 </UL>
 <P><B>Examples:</B>
 </P>
 <PRE>fix 5 all bond/break 10 2 1.2
-fix 5 polymer bond/break 1 1 2.0 prob 0.5 49829 
+fix 5 polymer bond/break 1 1 2.0 prob 0.5 49829 mol rxnmol 
 </PRE>
 <P><B>Description:</B>
 </P>
@@ -48,7 +49,7 @@ polymer network due to stretching of the simulation box or other
 deformations.  In this context, a bond means an interaction between a
 pair of atoms computed by the <A HREF = "bond_style.html">bond_style</A> command.
 Once the bond is broken it will be permanently deleted, as will all
-angle, dihedral, and improper interactions that bond is part of.
+angle, dihedral, and improper interactions that bond is part of. See the discussion of the <I>mol</I> keyword below. 
 </P>
 <P>This is different than a <A HREF = "pair_style.html">pairwise</A> bond-order
 potential such as Tersoff or AIREBO which infers bonds and many-body
@@ -81,7 +82,19 @@ broken.  The <I>fraction</I> setting must be a value between 0.0 and 1.0.
 A uniform random number between 0.0 and 1.0 is generated and the
 eligible bond is only broken if the random number < fraction.
 </P>
-<P>The <I>mol</I> keyword reads a <A HREF = "molecule.html">molecule</A> to determine how the environment near a broken bond is updated. A <I>molecule</I> containing a reaction template must be defined and read with the <I>mol</I> option. The <I>molecule</I> command describes the format of the reaction template.
+<P>The <I>mol</I> keyword can be used to control the atom types and charges 
+of atoms I and J, and other atoms near a broken bond.
+This means that atoms near a new bond can have different pairwise parameters
+before and after the new bond by specifying different
+<A HREF = "pair_coeff.html">pair_coeff</A> coefficients.  If you do not wish the
+atom types or charges of these <I>influenced atoms</I> to change, the same 
+before/after values should be given in the <I>RTypes</I> and <I>RCharges</I> 
+fields of the <I>reaction template</I>. When a bond is broken, the angle, 
+dihedral and improper interactions are removed, regardless of the content 
+of the <I>RAngles</I>, <I>RDihedrals</I> and <I>RImproper</I> fields of the reaction 
+template. The doc for <A HREF = "molecule.html">molecule</A> command descibes the 
+fields of the reaction template and influenced atoms. The <I>mol</I> keyword 
+is currently required. 
 </P>
 <P>When a bond is broken, data structures within LAMMPS that store bond
 topology are updated to reflect the breakage.  Likewise, if the bond
@@ -149,7 +162,7 @@ LAMMPS</A> section for more info.
 </P>
 <P><B>Related commands:</B>
 </P>
-<P><A HREF = "fix_bond_create.html">fix bond/create</A>, <A HREF = "fix_bond_swap.html">fix
+<P><A HREF = "fix_bond_create_rxn.html">fix bond/create/rxn</A>, <A HREF = "fix_bond_swap.html">fix
 bond/swap</A>, <A HREF = "dump.html">dump local</A>,
 <A HREF = "special_bonds.html">special_bonds</A>
 </P>

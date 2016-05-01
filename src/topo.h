@@ -66,7 +66,7 @@ private:
   int *dlist;
   int gbit, igbit;
 
-  double **test;
+  double **temp;
   // union data struct for packing 32-bit and 64-bit ints into double bufs
   // see atom_vec.h for documentation
   union ubuf {
