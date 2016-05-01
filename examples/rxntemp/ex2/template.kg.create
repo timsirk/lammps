@@ -1,0 +1,34 @@
+test template for CG system
+
+4 rtypes 
+1 rbonds 
+2 rangles 
+1 rdihedrals 
+0 rimpropers 
+
+RTypes 
+
+1 1 
+2 2
+3 3
+4 4
+
+RCharges 
+
+1 0.0
+2 0.0
+3 0.0
+4 0.0
+
+RBonds
+
+1 2 1 4 
+
+RAngles 
+
+1 2 1 4 3
+2 2 4 1 2
+
+RDihedrals 
+
+1 2 1 4 3 2

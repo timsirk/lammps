@@ -1,0 +1,13 @@
+This is an example shows some features of fix/bond/create/rxn with a reaction template. 
+
+polymer chain length 4
+chain ends are atom types 1 and 4. these have opposite charges +/- and attract
+chain interior beads are type 2 and 3, no charge
+
+LJ + FENE with charges
+
+Step 1. Dynamics with fix/bond/create/rxn is used to connect the chain ends. The two chains form a ring. When a new bond is made, the charges of the two beads are zeroed, and angles and dihedrals are added per the reaction template. 
+
+Step 2. The FENE bonds of the chain are broken in tension with fix/bond/break/rxn. The charges are returned to the initial value and the all angles and dihedrals are removed.
+
+Different reaction templates are used for fix/bond/create/rxn and fix/bond/break/rxn

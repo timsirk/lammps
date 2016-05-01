@@ -1,9 +1,0 @@
-this example models a curing reaction between polymer chains and a crosslinker. 
-
-polymer chain length 10
-chain ends are type 1
-chain interior beads are type 2
-
-crosslinker chain length 1
-crosslinker bead type 3
-

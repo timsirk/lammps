@@ -1,0 +1,25 @@
+This is an example shows some features of fix/bond/create/rxn with a reaction template. The system models a curing reaction between coarse-grain polymer chains and crosslinker beads.  
+
+polymer chain length 10
+chain ends are type 1
+chain interior beads are type 2
+
+crosslinker chain length 1
+crosslinker bead type 3
+
+chain ends form 1 new bond each
+crosslinkers form 3 new bonds each
+
+The chain model is LJ + FENE without charges. The chain ends make new bonds with the crosslinkers. When a new bond is made, one or more new angles and dihederals are added according to the atom-type sequences in template.kg
+
+case 1: one chain attaches to a crosslinker
+...2-2-1 + 3 = ...2-2-1-3
+bond 1-3 is added, type 2
+angle 2-1-3 is added, type 1
+
+case 2: two chains bridged by a crosslinker
+...2-2-1 + 3-1-2-2... = ...2-2-1-3-1-2-2...
+bond 1-3 is added, type 2
+angle 1-3-1 is added, type 2
+angle 2-3-1 is added, type 1
+dihedral 2-1-3-1 is added, type 1

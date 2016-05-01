@@ -2,21 +2,15 @@ test rxn template for CG system
 
 3 rtypes 
 1 rbonds 
-1 rangles 
+2 rangles 
 1 rdihedrals 
 0 rimpropers 
 
 RTypes
 
-1 2 # id type = type type
+1 1  # id type = type type
 2 2
-3 2
-
-RCharges
-
-1 0.0
-2 0.0
-3 0.0
+3 3
 
 RBonds
 
@@ -25,8 +19,9 @@ RBonds
 RAngles
 
 1 1 3 1 2 # ID type atom1 atom2 atom3
+2 2 1 3 1 
 
 RDihedrals
 
-1 1 3 1 2 2 # ID type atom1 atom2 atom3 atom4
+1 1 2 1 3 1 # ID type atom1 atom2 atom3 atom4
 

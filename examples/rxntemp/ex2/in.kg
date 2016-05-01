@@ -1,0 +1,68 @@
+# example fix bond create rxn
+# and fix bond break rxn
+
+units		lj
+atom_style	full
+special_bonds lj/coul 0 1.0 1.0
+
+read_data	data.twochains
+
+neighbor	0.4 bin
+neigh_modify	every 1 delay 1
+comm_modify cutoff 3.0
+
+bond_style  fene 
+bond_coeff	1 30.0 1.5 1.0 1.0
+bond_coeff	2 30.0 1.5 1.0 1.0
+angle_style  harmonic 
+angle_coeff	1 5.0 180.0
+angle_coeff	2 5.0 180.0
+dihedral_style  harmonic 
+dihedral_coeff	1 0.0 1 2
+dihedral_coeff	2 0.0 1 2
+
+pair_style	lj/cut/coul/cut 3.0
+pair_coeff	* * 1.0 1.0 
+pair_modify	shift yes
+
+velocity all create 1.0 4928459
+minimize 1.0e-4 1.0e-6 1000 10000
+
+fix		1 all nve
+fix		2 all langevin 1 1 10 904297
+
+thermo_style custom step temp bonds angles dihedrals 
+thermo          1000
+
+# small step for make/breaking bonds
+timestep	0.002
+
+##################################################
+# connect the two chains with a new bond
+# diffuse until distance is small
+
+molecule mymol0 template.kg.create
+fix 5 all bond/create/rxn 10 4 1 1.1 prob 1.0 1234 mol mymol0 imax 1 jmax 1 btype 2
+
+run 100000
+##################################################
+# pull chain apart
+change_box all boundary s s s
+
+# stop fbc
+unfix 5
+
+# define the rxn template and start fbb
+molecule mymol1 template.kg.break
+fix 5 all bond/break/rxn 10 2 1.3 mol mymol1
+
+# pull
+group ch0 id 4
+group ch1 id 5
+fix 6 ch0 setforce 0.0 0.0 0.0
+fix 7 ch1 setforce 0.0 0.0 0.0
+velocity ch0 set 0.1 0 0 units box
+velocity ch1 set -0.1 0 0 units box
+
+run 30000
+##################################################

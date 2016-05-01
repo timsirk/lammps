@@ -5,17 +5,20 @@ LAMMPS data file via write_data, version 23 Mar 2016-ICMS, timestep = 100000
 2880 bonds
 2 bond types
 0 angles
-1 angle types
+2 angle types
 0 dihedrals
 1 dihedral types
+0 impropers 
+1 improper types
 
 -7.9238210000000002e+00 7.9238210000000002e+00 xlo xhi
 -7.9238210000000002e+00 7.9238210000000002e+00 ylo yhi
 -7.9238210000000002e+00 7.9238210000000002e+00 zlo zhi
 
-2 extra bond per atom
-5 extra angle per atom
-5 extra dihedral per atom
+3 extra bond per atom
+10 extra angle per atom
+10 extra dihedral per atom
+10 extra improper per atom
 50 extra special per atom
 
 Masses

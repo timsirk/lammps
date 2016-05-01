@@ -1,0 +1,26 @@
+test template for CG system
+
+4 rtypes 
+1 rbonds 
+0 rangles 
+0 rdihedrals 
+0 rimpropers 
+
+RTypes
+
+1 1 
+2 2
+3 3
+4 4
+
+RCharges
+
+1 -1.0
+2 0.0
+3 0.0
+4 1.0
+
+RBonds
+
+1 2 4 1 # ID type atom1 atom2
+
