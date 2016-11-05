@@ -60,7 +60,7 @@ private:
   int maxinfluenced;
   int ncreate,ncreatelocal,maxcreate;
   int nbreak,nbreaklocal,maxbreak;
-  int **created, **broken; 
+  int **altered; 
   tagint *copy;
   tagint lastcheck;
   int *dlist;

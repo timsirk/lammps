@@ -62,7 +62,7 @@ Topo::Topo(LAMMPS *lmp) : Pointers(lmp) {
   // forward comm to update group info
   // comm_forward = MAX(2,2+atom->maxspecial);
 
-  memory->create(created,DELTA,2,"topo:created");
+  memory->create(altered,DELTA,2,"topo:altered");
   // copy = special list for one atom
   // size = ms^2 + ms is sufficient
   // b/c in rebuild_special() neighs of all 1-2s are added,
@@ -88,10 +88,10 @@ dump the bonds as debug
 int Topo::printBonds(bigint count, int** bond)
 {
 
-created = bond;
+altered = bond;
  
   for(int i = 0; i < count; i++)
-    printf("xcount %lld bond %d %d \n", count, created[i][0], created[i][1]);
+    printf("xcount %lld bond %d %d \n", count, altered[i][0], altered[i][1]);
 
   return 0;
 }
@@ -250,7 +250,7 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
     if (tag[i] < tag[j]) ncreatelocal++;
   }
  }
-  // make created list
+  // make altered list
   // this is list of new bonds that influence my owned atoms
   //   even if between owned-ghost or ghost-ghost atoms
   // finalpartner was passed in for owned and ghost atoms so loop over nall
@@ -270,10 +270,10 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
     if (j < 0 || tag[i] < tag[j]) {
       if (ncreate == maxcreate) {
         maxcreate += DELTA;
-        memory->grow(created,maxcreate,2,"topo:created");
+        memory->grow(altered,maxcreate,2,"topo:altered");
       }
-      created[ncreate][0] = tag[i];
-      created[ncreate][1] = finalpartner[i];
+      altered[ncreate][0] = tag[i];
+      altered[ncreate][1] = finalpartner[i];
       ncreate++;
     }
   }
@@ -293,12 +293,12 @@ int Topo::change_bonds(int bondflag, int* finalpartnerfromfix, Molecule *mymol)
 }
 
 /* ----------------------------------------------------------------------
-   double loop over my atoms and created bonds
-   influenced = 1 if atom's topology is affected by any created bond
+   double loop over my atoms and altered bonds
+   influenced = 1 if atom's topology is affected by any altered bond
      yes if is one of 2 atoms in bond
      yes if either atom ID appears in as 1-2 or 1-3 in atom's special list
      else no
-   if influenced by any created bond:
+   if influenced by any altered bond:
      rebuild the atom's special list of 1-2,1-3,1-4 neighs
      check for angles/dihedrals/impropers to create due modified special list
 ------------------------------------------------------------------------- */
@@ -337,8 +337,8 @@ void Topo::update_topology()
     slist = special[i];
 
     for (j = 0; j < ncreate; j++) {
-      id1 = created[j][0];
-      id2 = created[j][1];
+      id1 = altered[j][0];
+      id2 = altered[j][1];
       influence = 0;
       if (tag[i] == id1 || tag[i] == id2){
         influence = 1;
@@ -586,10 +586,10 @@ void Topo::create_angles(int m)
       // angle = i1-i2-i3
 
       for (n = 0; n < ncreate; n++) {
-        if (created[n][0] == i1 && created[n][1] == i2) break;
-        if (created[n][0] == i2 && created[n][1] == i1) break;
-        if (created[n][0] == i2 && created[n][1] == i3) break;
-        if (created[n][0] == i3 && created[n][1] == i2) break;
+        if (altered[n][0] == i1 && altered[n][1] == i2) break;
+        if (altered[n][0] == i2 && altered[n][1] == i1) break;
+        if (altered[n][0] == i2 && altered[n][1] == i3) break;
+        if (altered[n][0] == i3 && altered[n][1] == i2) break;
       }
       if (n == ncreate) continue;
 
@@ -631,10 +631,10 @@ void Topo::create_angles(int m)
       // angle = i1-i2-i3
 
       for (n = 0; n < ncreate; n++) {
-        if (created[n][0] == i1 && created[n][1] == i2) break;
-        if (created[n][0] == i2 && created[n][1] == i1) break;
-        if (created[n][0] == i2 && created[n][1] == i3) break;
-        if (created[n][0] == i3 && created[n][1] == i2) break;
+        if (altered[n][0] == i1 && altered[n][1] == i2) break;
+        if (altered[n][0] == i2 && altered[n][1] == i1) break;
+        if (altered[n][0] == i2 && altered[n][1] == i3) break;
+        if (altered[n][0] == i3 && altered[n][1] == i2) break;
       }
       if (n == ncreate) continue;
 
@@ -714,12 +714,12 @@ void Topo::create_dihedrals(int m)
         // dihedral = i1-i2-i3-i4
 
         for (n = 0; n < ncreate; n++) {
-          if (created[n][0] == i1 && created[n][1] == i2) break;
-          if (created[n][0] == i2 && created[n][1] == i1) break;
-          if (created[n][0] == i2 && created[n][1] == i3) break;
-          if (created[n][0] == i3 && created[n][1] == i2) break;
-          if (created[n][0] == i3 && created[n][1] == i4) break;
-          if (created[n][0] == i4 && created[n][1] == i3) break;
+          if (altered[n][0] == i1 && altered[n][1] == i2) break;
+          if (altered[n][0] == i2 && altered[n][1] == i1) break;
+          if (altered[n][0] == i2 && altered[n][1] == i3) break;
+          if (altered[n][0] == i3 && altered[n][1] == i2) break;
+          if (altered[n][0] == i3 && altered[n][1] == i4) break;
+          if (altered[n][0] == i4 && altered[n][1] == i3) break;
         }
         if (n < ncreate) {
           // check types 
@@ -764,12 +764,12 @@ void Topo::create_dihedrals(int m)
         // dihedral = i3-i2-i1-i4
 
         for (n = 0; n < ncreate; n++) {
-          if (created[n][0] == i3 && created[n][1] == i2) break;
-          if (created[n][0] == i2 && created[n][1] == i3) break;
-          if (created[n][0] == i2 && created[n][1] == i1) break;
-          if (created[n][0] == i1 && created[n][1] == i2) break;
-          if (created[n][0] == i1 && created[n][1] == i4) break;
-          if (created[n][0] == i4 && created[n][1] == i1) break;
+          if (altered[n][0] == i3 && altered[n][1] == i2) break;
+          if (altered[n][0] == i2 && altered[n][1] == i3) break;
+          if (altered[n][0] == i2 && altered[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i2) break;
+          if (altered[n][0] == i1 && altered[n][1] == i4) break;
+          if (altered[n][0] == i4 && altered[n][1] == i1) break;
         }
         if (n < ncreate) {
 
@@ -828,12 +828,12 @@ void Topo::create_dihedrals(int m)
         // dihedral = i1-i2-i3-i4
 
         for (n = 0; n < ncreate; n++) {
-          if (created[n][0] == i1 && created[n][1] == i2) break;
-          if (created[n][0] == i2 && created[n][1] == i1) break;
-          if (created[n][0] == i2 && created[n][1] == i3) break;
-          if (created[n][0] == i3 && created[n][1] == i2) break;
-          if (created[n][0] == i3 && created[n][1] == i4) break;
-          if (created[n][0] == i4 && created[n][1] == i3) break;
+          if (altered[n][0] == i1 && altered[n][1] == i2) break;
+          if (altered[n][0] == i2 && altered[n][1] == i1) break;
+          if (altered[n][0] == i2 && altered[n][1] == i3) break;
+          if (altered[n][0] == i3 && altered[n][1] == i2) break;
+          if (altered[n][0] == i3 && altered[n][1] == i4) break;
+          if (altered[n][0] == i4 && altered[n][1] == i3) break;
         }
         if (n < ncreate) {
 
@@ -912,12 +912,12 @@ void Topo::create_impropers(int m)
         // improper = i1-i2-i3-i4
 
         for (n = 0; n < ncreate; n++) {
-          if (created[n][0] == i1 && created[n][1] == i2) break;
-          if (created[n][0] == i2 && created[n][1] == i1) break;
-          if (created[n][0] == i1 && created[n][1] == i3) break;
-          if (created[n][0] == i3 && created[n][1] == i1) break;
-          if (created[n][0] == i1 && created[n][1] == i4) break;
-          if (created[n][0] == i4 && created[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i2) break;
+          if (altered[n][0] == i2 && altered[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i3) break;
+          if (altered[n][0] == i3 && altered[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i4) break;
+          if (altered[n][0] == i4 && altered[n][1] == i1) break;
         }
         if (n == ncreate) continue;
 
@@ -963,12 +963,12 @@ void Topo::create_impropers(int m)
         // improper = i1-i2-i3-i4
 
         for (n = 0; n < ncreate; n++) {
-          if (created[n][0] == i1 && created[n][1] == i2) break;
-          if (created[n][0] == i2 && created[n][1] == i1) break;
-          if (created[n][0] == i1 && created[n][1] == i3) break;
-          if (created[n][0] == i3 && created[n][1] == i1) break;
-          if (created[n][0] == i1 && created[n][1] == i4) break;
-          if (created[n][0] == i4 && created[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i2) break;
+          if (altered[n][0] == i2 && altered[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i3) break;
+          if (altered[n][0] == i3 && altered[n][1] == i1) break;
+          if (altered[n][0] == i1 && altered[n][1] == i4) break;
+          if (altered[n][0] == i4 && altered[n][1] == i1) break;
         }
         if (n < ncreate) {
 
